@@ -56,10 +56,21 @@ uint8_t command = 0x80; // try 0x80 later
 // uint8_t byte_1 = (address << 1) | command; // 0x01 //address | command; // 0x10
 uint8_t byte_2 = 0x00;
 
-uint8_t rate_x_lsb = 0x00;
-uint8_t rate_x_msb = 0x00;
-int16_t rate_x_raw = 0x00;
+uint8_t rate_x_lsb;
+uint8_t rate_x_msb;
+int16_t rate_x_raw;
+
+uint8_t rate_y_lsb;
+uint8_t rate_y_msb;
+int16_t rate_y_raw;
+
+uint8_t rate_z_lsb;
+uint8_t rate_z_msb;
+int16_t rate_z_raw;
+
 float rate_x;
+float rate_y;
+float rate_z;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -139,24 +150,21 @@ int main(void)
     rate_x_lsb = byte_2;
     gyro_spi_read(ADDR_RATE_X_MSB);
     rate_x_msb = byte_2;
+    gyro_spi_read(ADDR_RATE_Y_LSB);
+    rate_y_lsb = byte_2;
+    gyro_spi_read(ADDR_RATE_Y_MSB);
+    rate_y_msb = byte_2;
+    gyro_spi_read(ADDR_RATE_Z_LSB);
+    rate_z_lsb = byte_2;
+    gyro_spi_read(ADDR_RATE_Z_MSB);
+    rate_z_msb = byte_2;
+
     rate_x_raw = (rate_x_msb << 8 | rate_x_lsb); // msb*256+lsb
+    rate_y_raw = (rate_y_msb << 8 | rate_y_lsb); 
+    rate_z_raw = (rate_z_msb << 8 | rate_z_lsb); 
     rate_x = rate_x_raw * 0.061f; // degrees/s
-
-
-    // 1. Send address and R/W command.
-    // HAL_GPIO_WritePin(GPIOB, GPIO4_Pin, GPIO_PIN_RESET);  // Chip select gyro, active low
-    // HAL_Delay(100);
-    // HAL_SPI_Transmit(&hspi1, &byte_1, byte_size, timeout); // Send byte 1
-    // HAL_Delay(100);
-
-
-    // // 2. Read data
-    // HAL_SPI_Receive(&hspi1, &byte_2, byte_size, timeout);
-    // HAL_GPIO_WritePin(GPIOB, GPIO4_Pin, GPIO_PIN_SET);  // End comms
-
-    // HAL_Delay(100);
-
-
+    rate_y = rate_y_raw * 0.061f; 
+    rate_z = rate_z_raw * 0.061f; 
 
   //  /* Example: Update duty cycle dynamically */
   //   for (int duty = 0; duty <= 99; duty += 10)
