@@ -1,0 +1,6 @@
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/build/Debug/CMakeFiles/RCS.dir
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/build/Debug/CMakeFiles/edit_cache.dir
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/build/Debug/CMakeFiles/rebuild_cache.dir
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/build/Debug/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/build/Debug/cmake/stm32cubemx/CMakeFiles/edit_cache.dir
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/build/Debug/cmake/stm32cubemx/CMakeFiles/rebuild_cache.dir
