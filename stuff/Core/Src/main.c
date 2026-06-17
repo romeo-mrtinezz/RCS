@@ -101,6 +101,9 @@ int main(void)
   MX_TIM1_Init();
   MX_USB_PCD_Init();
   /* USER CODE BEGIN 2 */
+  // HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_SET);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  TIM1->CCR1 = 5000; // 50% duty cycle for ARR = 10,000
 
   /* USER CODE END 2 */
 
@@ -108,6 +111,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    // HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_SET);
+    // HAL_Delay(1000);
+    // HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_RESET);
+    // HAL_Delay(1000);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
