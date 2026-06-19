@@ -21,6 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "bmi088.h"
+#include <stdint.h>
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -48,6 +51,23 @@ TIM_HandleTypeDef htim1;
 PCD_HandleTypeDef hpcd_USB_FS;
 
 /* USER CODE BEGIN PV */
+uint8_t byte_2;
+
+uint8_t rate_x_lsb;
+uint8_t rate_x_msb;
+int16_t rate_x_raw;
+
+uint8_t rate_y_lsb;
+uint8_t rate_y_msb;
+int16_t rate_y_raw;
+
+uint8_t rate_z_lsb;
+uint8_t rate_z_msb;
+int16_t rate_z_raw;
+
+float rate_x;
+float rate_y;
+float rate_z;
 
 /* USER CODE END PV */
 
@@ -59,6 +79,21 @@ static void MX_SPI2_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_USB_PCD_Init(void);
 /* USER CODE BEGIN PFP */
+void gyro_spi_read(uint8_t address) {
+  // Calculate byte 1 from address and R command
+  uint8_t byte_1 = address | 0x80;
+
+  // 1. Send address and R command
+  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_RESET); // Chip select low
+  // HAL_Delay(100);
+  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
+  // HAL_Delay(100);
+
+  // 2. Read data
+  HAL_SPI_Receive(&hspi1, &byte_2, BYTE_SIZE, TIMEOUT);
+  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_SET);  // End comms
+  // don't have to return anything because we passed in address of byte 2
+};
 
 /* USER CODE END PFP */
 
@@ -102,8 +137,8 @@ int main(void)
   MX_USB_PCD_Init();
   /* USER CODE BEGIN 2 */
   // HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_SET);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  TIM1->CCR1 = 5000; // 50% duty cycle for ARR = 10,000
+  // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  // TIM1->CCR1 = 5000; // 50% duty cycle for ARR = 10,000
 
   /* USER CODE END 2 */
 
@@ -111,6 +146,27 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    gyro_spi_read(GYRO_CHIP_ID);
+
+    gyro_spi_read(ADDR_RATE_X_LSB);
+    rate_x_lsb = byte_2;
+    gyro_spi_read(ADDR_RATE_X_MSB);
+    rate_x_msb = byte_2;
+    gyro_spi_read(ADDR_RATE_Y_LSB);
+    rate_y_lsb = byte_2;
+    gyro_spi_read(ADDR_RATE_Y_MSB);
+    rate_y_msb = byte_2;
+    gyro_spi_read(ADDR_RATE_Z_LSB);
+    rate_z_lsb = byte_2;
+    gyro_spi_read(ADDR_RATE_Z_MSB);
+    rate_z_msb = byte_2;
+
+    rate_x_raw = (rate_x_msb << 8 | rate_x_lsb); // msb*256+lsb
+    rate_y_raw = (rate_y_msb << 8 | rate_y_lsb); 
+    rate_z_raw = (rate_z_msb << 8 | rate_z_lsb); 
+    rate_x = rate_x_raw * 0.061f; // degrees/s
+    rate_y = rate_y_raw * 0.061f; 
+    rate_z = rate_z_raw * 0.061f;     
     // HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_SET);
     // HAL_Delay(1000);
     // HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_RESET);
@@ -188,7 +244,7 @@ static void MX_SPI1_Init(void)
   hspi1.Instance = SPI1;
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
