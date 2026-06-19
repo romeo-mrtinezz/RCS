@@ -166,22 +166,54 @@ int main(void)
     rate_y = rate_y_raw * 0.061f; 
     rate_z = rate_z_raw * 0.061f; 
 
-  //  /* Example: Update duty cycle dynamically */
-  //   for (int duty = 0; duty <= 99; duty += 10)
-  //   {
-  //     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);  // TIM1->CCR1 = duty;
-  //     HAL_Delay(500);  // Wait 500ms before changing duty cycle
-  //   }
-    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 1);
-    // HAL_Delay(1000);
-    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 0);
-    // HAL_Delay(200);
+    // // Burst mode - use if we need a buffer of data to feed into control alg for e.g.
+    // uint8_t fifo_buffer[600]; // 6 bytes? + 2 bytes interrupt data, * 100 frames
+    // uint8_t byte1 = FIFO_CONFIG_1 | 0x00; // write command
+    // uint8_t mode = 0x40; // FIFO mode, data collection stops once 100 frames reached
 
-    /* USER CODE END WHILE */
+    // // Set FIFO mode
+    // HAL_GPIO_WritePin(GPIOB, GPIO4_Pin, GPIO_PIN_RESET); // Chip select low
+    // HAL_SPI_Transmit(&hspi1, &byte1, BYTE_SIZE, TIMEOUT);
+    // HAL_SPI_Transmit(&hspi1, &mode, BYTE_SIZE, TIMEOUT);
+    // HAL_GPIO_WritePin(GPIOB, GPIO4_Pin, GPIO_PIN_SET); // End transaction
 
-    /* USER CODE BEGIN 3 */
-    // HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-    // HAL_Delay(100);
+    // HAL_Delay(200); // Simulates cpu doing other task
+
+    // // Check how many frames are ready
+    // byte1 = FIFO_STATUS | 0x80;
+    // uint8_t fill_level;
+    // HAL_GPIO_WritePin(GPIOB, GPIO4_Pin, GPIO_PIN_RESET); // Chip select low
+    // HAL_SPI_Transmit(&hspi1, &byte1, BYTE_SIZE, TIMEOUT);
+    // HAL_SPI_Receive(&hspi1, &fill_level, BYTE_SIZE, TIMEOUT);
+    // HAL_GPIO_WritePin(GPIOB, GPIO4_Pin, GPIO_PIN_SET); // End transaction  
+    // uint8_t frame_count = fill_level & 0x7F; // could be reversed bitmasking
+
+    // if (frame_count > 0) { // if there is data in the buffer, 
+    //   // Read FIFO data register
+    //   byte1 = FIFO_DATA | 0x80;
+    //   HAL_GPIO_WritePin(GPIOB, GPIO4_Pin, GPIO_PIN_RESET); // Chip select low
+    //   HAL_SPI_Transmit(&hspi1, &byte1, BYTE_SIZE, TIMEOUT);
+    //   HAL_SPI_Receive(&hspi1, fifo_buffer, frame_count*6, TIMEOUT);
+    //   HAL_GPIO_WritePin(GPIOB, GPIO4_Pin, GPIO_PIN_SET); // End transaction
+
+    // };
+
+    // // Deconstruct buffer
+    // GyroData parsed[frame_count]; // array of gyro_data frames
+
+    // // loop through each frame
+    // for (int i = 0; i < frame_count; i ++) {
+    //   int idx = i * 6;
+    //     int16_t rate_x = (fifo_buffer[idx+1] << 8 | fifo_buffer[idx]) * 0.061f;
+    //     int16_t rate_y =  (fifo_buffer[idx+3] << 8 | fifo_buffer[idx+2]) * 0.061f;
+    //     int16_t rate_z = (fifo_buffer[idx+5] << 8 | fifo_buffer[idx+4]) * 0.061f;
+
+    //     // store frame into array
+    //     parsed[i].rate_x = rate_x;
+    //     parsed[i].rate_y = rate_y;
+    //     parsed[i].rate_z = rate_z;
+    // };
+
 
   }
   /* USER CODE END 3 */
