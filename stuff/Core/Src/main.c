@@ -79,7 +79,16 @@ static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_USB_PCD_Init(void);
+
 /* USER CODE BEGIN PFP */
+void run_blinky() {
+  // Use function in while loop
+  HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_SET);
+  HAL_Delay(1000);
+  HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_RESET);
+  HAL_Delay(1000);
+};
+
 void gyro_spi_read(uint8_t address) {
   // Calculate byte 1 from address and R command
   uint8_t byte_1 = address | 0x80;
@@ -141,12 +150,29 @@ uint8_t accel_spi_read(uint8_t address) {
   return result; 
 };
 
-void run_blinky() {
-  // Use function in while loop
-  HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_SET);
-  HAL_Delay(1000);
-  HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_RESET);
-  HAL_Delay(1000);
+/** 
+  * @brief read all 3 axis at once
+  * @param first_address
+  * @retval None
+*/
+AccData accel_burst_read(uint8_t first_address) {
+  uint8_t dummy;
+  uint8_t byte_1 = first_address | 0x80; // R mode
+  uint8_t acc_buffer[6]; // 6 bytes of data
+  AccData accel_data;
+
+  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_RESET); // pull cs low
+  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
+  HAL_SPI_Receive(&hspi1, &dummy, BYTE_SIZE, TIMEOUT); // dummy
+  HAL_SPI_Receive(&hspi1, acc_buffer, sizeof(acc_buffer), TIMEOUT);
+  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // end transaction
+
+  // cast to int due to 2's complement
+  accel_data.acc_x = (int16_t)(acc_buffer[1] << 8 | acc_buffer[0])/32768.0f * 1000.0f * 4.0f * 1.5f;
+  accel_data.acc_y = (int16_t)(acc_buffer[3] << 8 | acc_buffer[2])/32768.0f * 1000.0f * 4.0f * 1.5f;
+  accel_data.acc_z = (int16_t)(acc_buffer[5] << 8 | acc_buffer[4])/32768.0f * 1000.0f * 4.0f * 1.5f;
+
+  return accel_data;
 };
 
 /* USER CODE END PFP */
@@ -210,6 +236,7 @@ int main(void)
   float acc_z;
 
   byte_2 = initialise_accel();
+  AccData accel_data;
 
   /* USER CODE END 2 */
 
@@ -217,22 +244,24 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    acc_x_lsb = accel_spi_read(ACC_X_LSB);
-    acc_x_msb = accel_spi_read(ACC_X_MSB);
-    acc_y_lsb = accel_spi_read(ACC_Y_LSB);
-    acc_y_msb = accel_spi_read(ACC_Y_MSB);
-    acc_z_lsb = accel_spi_read(ACC_Z_LSB);
-    acc_z_msb = accel_spi_read(ACC_Z_MSB);
+    accel_data = accel_burst_read(ACC_X_LSB);
 
-    acc_x_raw = (acc_x_msb << 8 | acc_x_lsb); // msb*256+lsb
-    acc_y_raw = (acc_y_msb << 8 | acc_y_lsb);
-    acc_z_raw = (acc_z_msb << 8 | acc_z_lsb);
+    // acc_x_lsb = accel_spi_read(ACC_X_LSB);
+    // acc_x_msb = accel_spi_read(ACC_X_MSB);
+    // acc_y_lsb = accel_spi_read(ACC_Y_LSB);
+    // acc_y_msb = accel_spi_read(ACC_Y_MSB);
+    // acc_z_lsb = accel_spi_read(ACC_Z_LSB);
+    // acc_z_msb = accel_spi_read(ACC_Z_MSB);
 
-    // default acc_range 0x01, +-6g
-    // Accel in mg
-    acc_x = acc_x_raw/32768.0f * 1000.0f * 4.0f * 1.5f;
-    acc_y = acc_y_raw/32768.0f * 1000.0f * 4.0f * 1.5f;
-    acc_z = acc_z_raw/32768.0f * 1000.0f * 4.0f * 1.5f;
+    // acc_x_raw = (acc_x_msb << 8 | acc_x_lsb); // msb*256+lsb
+    // acc_y_raw = (acc_y_msb << 8 | acc_y_lsb);
+    // acc_z_raw = (acc_z_msb << 8 | acc_z_lsb);
+
+    // // default acc_range 0x01, +-6g
+    // // Accel in mg
+    // acc_x = acc_x_raw/32768.0f * 1000.0f * 4.0f * 1.5f;
+    // acc_y = acc_y_raw/32768.0f * 1000.0f * 4.0f * 1.5f;
+    // acc_z = acc_z_raw/32768.0f * 1000.0f * 4.0f * 1.5f;-----------------------
     // gyro_spi_read(GYRO_CHIP_ID);
 
     // gyro_spi_read(ADDR_RATE_X_LSB);

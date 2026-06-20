@@ -77,5 +77,11 @@ typedef struct {
   float rate_z;
 } GyroData;
 
+typedef struct {
+    float acc_x;
+    float acc_y;
+    float acc_z;
+} AccData;
+
 
 #endif /* __BMI088_H */
