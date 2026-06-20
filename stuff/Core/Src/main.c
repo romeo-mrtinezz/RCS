@@ -22,7 +22,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "bmi088.h"
+#include "stm32g483xx.h"
 #include "stm32g4xx_hal_gpio.h"
+#include "stm32g4xx_hal_spi.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -114,7 +116,7 @@ uint8_t initialise_accel() {
 
   // 1. Switch to spi mode
   HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // rising edge to switch to spi
-  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_SET); // deselect gyro
+  // HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_SET); // deselect gyro
 
 
   // 2. Switch from suspend mode to normal power mode
@@ -168,11 +170,30 @@ AccData accel_burst_read(uint8_t first_address) {
   HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // end transaction
 
   // cast to int due to 2's complement
-  accel_data.acc_x = (int16_t)(acc_buffer[1] << 8 | acc_buffer[0])/32768.0f * 1000.0f * 4.0f * 1.5f;
+  // default acc_range 0x01, +-6g
+  // Accel in mg
+  accel_data.acc_x = (int16_t)(acc_buffer[1] << 8 | acc_buffer[0])/32768.0f * 1000.0f * 4.0f * 1.5f; // msb*256+lsb 
   accel_data.acc_y = (int16_t)(acc_buffer[3] << 8 | acc_buffer[2])/32768.0f * 1000.0f * 4.0f * 1.5f;
   accel_data.acc_z = (int16_t)(acc_buffer[5] << 8 | acc_buffer[4])/32768.0f * 1000.0f * 4.0f * 1.5f;
 
   return accel_data;
+};
+
+GyroData gyro_burst_read(uint8_t first_address) {
+  uint8_t byte_1 = first_address | 0x80; // R mode
+  uint8_t gyro_buffer[6]; // 6 bytes of data
+  GyroData gyro_data;
+
+  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT);
+  HAL_SPI_Receive(&hspi1, gyro_buffer, sizeof(gyro_buffer), TIMEOUT);
+  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_SET);
+
+  gyro_data.rate_x = (int16_t)(gyro_buffer[1] << 8 | gyro_buffer[0]) * 0.061f;
+  gyro_data.rate_y = (int16_t)(gyro_buffer[3] << 8 | gyro_buffer[2]) * 0.061f;
+  gyro_data.rate_z = (int16_t)(gyro_buffer[5] << 8 | gyro_buffer[4]) * 0.061f;
+
+  return gyro_data;
 };
 
 /* USER CODE END PFP */
@@ -237,6 +258,7 @@ int main(void)
 
   byte_2 = initialise_accel();
   AccData accel_data;
+  GyroData gyro_data;
 
   /* USER CODE END 2 */
 
@@ -245,23 +267,7 @@ int main(void)
   while (1)
   { 
     accel_data = accel_burst_read(ACC_X_LSB);
-
-    // acc_x_lsb = accel_spi_read(ACC_X_LSB);
-    // acc_x_msb = accel_spi_read(ACC_X_MSB);
-    // acc_y_lsb = accel_spi_read(ACC_Y_LSB);
-    // acc_y_msb = accel_spi_read(ACC_Y_MSB);
-    // acc_z_lsb = accel_spi_read(ACC_Z_LSB);
-    // acc_z_msb = accel_spi_read(ACC_Z_MSB);
-
-    // acc_x_raw = (acc_x_msb << 8 | acc_x_lsb); // msb*256+lsb
-    // acc_y_raw = (acc_y_msb << 8 | acc_y_lsb);
-    // acc_z_raw = (acc_z_msb << 8 | acc_z_lsb);
-
-    // // default acc_range 0x01, +-6g
-    // // Accel in mg
-    // acc_x = acc_x_raw/32768.0f * 1000.0f * 4.0f * 1.5f;
-    // acc_y = acc_y_raw/32768.0f * 1000.0f * 4.0f * 1.5f;
-    // acc_z = acc_z_raw/32768.0f * 1000.0f * 4.0f * 1.5f;-----------------------
+    gyro_data = gyro_burst_read(ADDR_RATE_X_LSB);
     // gyro_spi_read(GYRO_CHIP_ID);
 
     // gyro_spi_read(ADDR_RATE_X_LSB);
