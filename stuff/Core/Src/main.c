@@ -56,22 +56,6 @@ PCD_HandleTypeDef hpcd_USB_FS;
 /* USER CODE BEGIN PV */
 uint8_t byte_2;
 
-uint8_t rate_x_lsb;
-uint8_t rate_x_msb;
-int16_t rate_x_raw;
-
-uint8_t rate_y_lsb;
-uint8_t rate_y_msb;
-int16_t rate_y_raw;
-
-uint8_t rate_z_lsb;
-uint8_t rate_z_msb;
-int16_t rate_z_raw;
-
-float rate_x;
-float rate_y;
-float rate_z;
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -90,7 +74,7 @@ void run_blinky() {
   HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_RESET);
   HAL_Delay(1000);
 };
-
+ 
 void gyro_spi_read(uint8_t address) {
   // Calculate byte 1 from address and R command
   uint8_t byte_1 = address | 0x80;
@@ -117,7 +101,6 @@ uint8_t initialise_accel() {
   // 1. Switch to spi mode
   HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // rising edge to switch to spi
   // HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_SET); // deselect gyro
-
 
   // 2. Switch from suspend mode to normal power mode
   HAL_Delay(1);
@@ -240,22 +223,6 @@ int main(void)
   // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   // TIM1->CCR1 = 5000; // 50% duty cycle for ARR = 10,000
 
-  uint8_t acc_x_lsb;
-  uint8_t acc_x_msb; 
-  int16_t acc_x_raw;
-
-  uint8_t acc_y_lsb;
-  uint8_t acc_y_msb; 
-  int16_t acc_y_raw;
-
-  uint8_t acc_z_lsb;
-  uint8_t acc_z_msb;
-  int16_t acc_z_raw;
-
-  float acc_x;
-  float acc_y;
-  float acc_z;
-
   byte_2 = initialise_accel();
   AccData accel_data;
   GyroData gyro_data;
@@ -268,27 +235,7 @@ int main(void)
   { 
     accel_data = accel_burst_read(ACC_X_LSB);
     gyro_data = gyro_burst_read(ADDR_RATE_X_LSB);
-    // gyro_spi_read(GYRO_CHIP_ID);
-
-    // gyro_spi_read(ADDR_RATE_X_LSB);
-    // rate_x_lsb = byte_2;
-    // gyro_spi_read(ADDR_RATE_X_MSB);
-    // rate_x_msb = byte_2;
-    // gyro_spi_read(ADDR_RATE_Y_LSB);
-    // rate_y_lsb = byte_2;
-    // gyro_spi_read(ADDR_RATE_Y_MSB);
-    // rate_y_msb = byte_2;
-    // gyro_spi_read(ADDR_RATE_Z_LSB);
-    // rate_z_lsb = byte_2;
-    // gyro_spi_read(ADDR_RATE_Z_MSB);
-    // rate_z_msb = byte_2;
-
-    // rate_x_raw = (rate_x_msb << 8 | rate_x_lsb); // msb*256+lsb
-    // rate_y_raw = (rate_y_msb << 8 | rate_y_lsb); 
-    // rate_z_raw = (rate_z_msb << 8 | rate_z_lsb); 
-    // rate_x = rate_x_raw * 0.061f; // degrees/s
-    // rate_y = rate_y_raw * 0.061f; 
-    // rate_z = rate_z_raw * 0.061f;     
+    // gyro_spi_read(GYRO_CHIP_ID); 
 
     /* USER CODE END WHILE */
 
