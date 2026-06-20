@@ -127,17 +127,18 @@ uint8_t initialise_accel() {
   return accel_id; // expect 0x1E = 30 
 };
 
-void accel_spi_read(uint8_t address) {
-  // UNFINISHED
-  // Calculate byte 1 from address and R command
-  uint8_t byte_1 = address | 0x80;
-  //  Send address and R command
-  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_RESET); // Chip select low
-  // HAL_Delay(100);
+uint8_t accel_spi_read(uint8_t address) {
+  uint8_t result;
+  uint8_t dummy;
+
+  uint8_t byte_1 = address | 0x80; // R mode
+  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_RESET); // pull cs low
   HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
-  // HAL_Delay(100);
-
-
+  HAL_SPI_Receive(&hspi1, &dummy, BYTE_SIZE, TIMEOUT); // dummy
+  HAL_SPI_Receive(&hspi1, &result, BYTE_SIZE, TIMEOUT);
+  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // end transaction
+  
+  return result; 
 };
 
 void run_blinky() {
@@ -192,14 +193,46 @@ int main(void)
   // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   // TIM1->CCR1 = 5000; // 50% duty cycle for ARR = 10,000
 
+  uint8_t acc_x_lsb;
+  uint8_t acc_x_msb; 
+  int16_t acc_x_raw;
+
+  uint8_t acc_y_lsb;
+  uint8_t acc_y_msb; 
+  int16_t acc_y_raw;
+
+  uint8_t acc_z_lsb;
+  uint8_t acc_z_msb;
+  int16_t acc_z_raw;
+
+  float acc_x;
+  float acc_y;
+  float acc_z;
+
+  byte_2 = initialise_accel();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    byte_2 = initialise_accel();
-    
+    acc_x_lsb = accel_spi_read(ACC_X_LSB);
+    acc_x_msb = accel_spi_read(ACC_X_MSB);
+    acc_y_lsb = accel_spi_read(ACC_Y_LSB);
+    acc_y_msb = accel_spi_read(ACC_Y_MSB);
+    acc_z_lsb = accel_spi_read(ACC_Z_LSB);
+    acc_z_msb = accel_spi_read(ACC_Z_MSB);
+
+    acc_x_raw = (acc_x_msb << 8 | acc_x_lsb); // msb*256+lsb
+    acc_y_raw = (acc_y_msb << 8 | acc_y_lsb);
+    acc_z_raw = (acc_z_msb << 8 | acc_z_lsb);
+
+    // default acc_range 0x01, +-6g
+    // Accel in mg
+    acc_x = acc_x_raw/32768.0f * 1000.0f * 4.0f * 1.5f;
+    acc_y = acc_y_raw/32768.0f * 1000.0f * 4.0f * 1.5f;
+    acc_z = acc_z_raw/32768.0f * 1000.0f * 4.0f * 1.5f;
     // gyro_spi_read(GYRO_CHIP_ID);
 
     // gyro_spi_read(ADDR_RATE_X_LSB);
