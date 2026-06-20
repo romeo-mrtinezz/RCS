@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "bmi088.h"
+#include "stm32g4xx_hal_gpio.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -95,6 +96,58 @@ void gyro_spi_read(uint8_t address) {
   // don't have to return anything because we passed in address of byte 2
 };
 
+
+uint8_t initialise_accel() {
+  uint8_t byte_1 = ACC_PWR_CTRL | 0x00; // Write mode
+  uint8_t pwr_set = 0x04;
+  uint8_t accel_id;
+  uint8_t dummy;
+
+  // 1. Switch to spi mode
+  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // rising edge to switch to spi
+  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_SET); // deselect gyro
+
+
+  // 2. Switch from suspend mode to normal power mode
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
+  HAL_SPI_Transmit(&hspi1, &pwr_set, BYTE_SIZE, TIMEOUT); // Send byte 1
+  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); 
+  HAL_Delay(1);
+
+  // 3. Read accel id
+  byte_1 = ACC_CHIP_ID | 0x80;
+  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_RESET); // pull cs low
+  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
+  HAL_SPI_Receive(&hspi1, &dummy, BYTE_SIZE, TIMEOUT); // dummy
+  HAL_SPI_Receive(&hspi1, &accel_id, BYTE_SIZE, TIMEOUT);
+  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // end transaction
+  
+  return accel_id; // expect 0x1E = 30 
+};
+
+void accel_spi_read(uint8_t address) {
+  // UNFINISHED
+  // Calculate byte 1 from address and R command
+  uint8_t byte_1 = address | 0x80;
+  //  Send address and R command
+  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_RESET); // Chip select low
+  // HAL_Delay(100);
+  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
+  // HAL_Delay(100);
+
+
+};
+
+void run_blinky() {
+  // Use function in while loop
+  HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_SET);
+  HAL_Delay(1000);
+  HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_RESET);
+  HAL_Delay(1000);
+};
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -136,7 +189,6 @@ int main(void)
   MX_TIM1_Init();
   MX_USB_PCD_Init();
   /* USER CODE BEGIN 2 */
-  // HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_SET);
   // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   // TIM1->CCR1 = 5000; // 50% duty cycle for ARR = 10,000
 
@@ -145,32 +197,30 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  {
-    gyro_spi_read(GYRO_CHIP_ID);
+  { 
+    byte_2 = initialise_accel();
+    
+    // gyro_spi_read(GYRO_CHIP_ID);
 
-    gyro_spi_read(ADDR_RATE_X_LSB);
-    rate_x_lsb = byte_2;
-    gyro_spi_read(ADDR_RATE_X_MSB);
-    rate_x_msb = byte_2;
-    gyro_spi_read(ADDR_RATE_Y_LSB);
-    rate_y_lsb = byte_2;
-    gyro_spi_read(ADDR_RATE_Y_MSB);
-    rate_y_msb = byte_2;
-    gyro_spi_read(ADDR_RATE_Z_LSB);
-    rate_z_lsb = byte_2;
-    gyro_spi_read(ADDR_RATE_Z_MSB);
-    rate_z_msb = byte_2;
+    // gyro_spi_read(ADDR_RATE_X_LSB);
+    // rate_x_lsb = byte_2;
+    // gyro_spi_read(ADDR_RATE_X_MSB);
+    // rate_x_msb = byte_2;
+    // gyro_spi_read(ADDR_RATE_Y_LSB);
+    // rate_y_lsb = byte_2;
+    // gyro_spi_read(ADDR_RATE_Y_MSB);
+    // rate_y_msb = byte_2;
+    // gyro_spi_read(ADDR_RATE_Z_LSB);
+    // rate_z_lsb = byte_2;
+    // gyro_spi_read(ADDR_RATE_Z_MSB);
+    // rate_z_msb = byte_2;
 
-    rate_x_raw = (rate_x_msb << 8 | rate_x_lsb); // msb*256+lsb
-    rate_y_raw = (rate_y_msb << 8 | rate_y_lsb); 
-    rate_z_raw = (rate_z_msb << 8 | rate_z_lsb); 
-    rate_x = rate_x_raw * 0.061f; // degrees/s
-    rate_y = rate_y_raw * 0.061f; 
-    rate_z = rate_z_raw * 0.061f;     
-    // HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_SET);
-    // HAL_Delay(1000);
-    // HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_RESET);
-    // HAL_Delay(1000);
+    // rate_x_raw = (rate_x_msb << 8 | rate_x_lsb); // msb*256+lsb
+    // rate_y_raw = (rate_y_msb << 8 | rate_y_lsb); 
+    // rate_z_raw = (rate_z_msb << 8 | rate_z_lsb); 
+    // rate_x = rate_x_raw * 0.061f; // degrees/s
+    // rate_y = rate_y_raw * 0.061f; 
+    // rate_z = rate_z_raw * 0.061f;     
 
     /* USER CODE END WHILE */
 

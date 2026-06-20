@@ -36,7 +36,7 @@ burst access mechanism which auto-increments the register being read without hav
 #ifndef BMI088_H
 #define BMI088_H
 
-// Addresses-----------------
+// Gyroscope register map-----------------
 // Read only
 #define GYRO_CHIP_ID         0x00
 #define ADDR_RATE_X_LSB      0x02 
@@ -53,7 +53,20 @@ burst access mechanism which auto-increments the register being read without hav
 #define FIFO_CONFIG_1 0x3E
 #define GYRO_INT_CTRL 0x15
 
-// Constants----------------------------
+// Accelerometer register map
+// Read only
+#define ACC_CHIP_ID         0x00
+#define ACC_X_LSB           0x12
+#define ACC_X_MSB           0x13
+#define ACC_Y_LSB           0x14
+#define ACC_Y_MSB           0x15
+#define ACC_Z_LSB           0x16
+#define ACC_Z_MSB           0x17
+
+// Read/write
+#define ACC_PWR_CTRL        0x7D
+
+// Constants
 #define TIMEOUT 100 //ms
 #define BYTE_SIZE 1
 
