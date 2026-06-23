@@ -29,9 +29,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "sd_functions.h"
-#include "sd_benchmark.h"
-
 
 /* USER CODE END Includes */
 
@@ -242,12 +239,6 @@ int main(void)
   GyroData gyro_data;
 
   // SD card variables --------------------------------------
-  uint8_t bufr[80]; // store data read from sd card file
-  UINT br; // store number of bytes read from file
-
-  sd_mount();
-  sd_list_files();
-  sd_unmount();
 
   /* USER CODE END 2 */
 

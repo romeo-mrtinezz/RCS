@@ -57,6 +57,9 @@
 /* External variables --------------------------------------------------------*/
 extern DMA_HandleTypeDef hdma_spi2_rx;
 extern DMA_HandleTypeDef hdma_spi2_tx;
+
+extern uint16_t Timer2, Timer3;
+
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -184,7 +187,10 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-
+  if(Timer2 > 0)
+    Timer2--;
+  if(Timer3 > 0)
+    Timer3--;
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
