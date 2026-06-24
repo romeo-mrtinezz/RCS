@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "bmi088.h"
+#include "ff.h"
 #include "stm32g483xx.h"
 #include "stm32g4xx_hal_gpio.h"
 #include "stm32g4xx_hal_spi.h"
@@ -71,6 +72,7 @@ static void MX_SPI2_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_USB_PCD_Init(void);
 static void SD_Card_Test(void);
+static void SD_Card_Write(void);
 /* USER CODE BEGIN PFP */
 void run_blinky() {
   // Use function in while loop
@@ -238,7 +240,8 @@ int main(void)
   AccData accel_data;
   GyroData gyro_data;
 
-  SD_Card_Test();
+  // SD_Card_Test();
+  SD_Card_Write();
 
   /* USER CODE END 2 */
 
@@ -271,7 +274,57 @@ int main(void)
   }
   /* USER CODE END 3 */
 }
-static void SD_Card_Test(void)
+
+static void SD_Card_Write(void) {
+  FATFS FatFs;
+  FIL Fil;
+  FRESULT FR_Status;
+  FATFS *FS_Ptr;
+  UINT RWC, WWC; // Read/Write Word Counter
+  DWORD FreeClusters;
+  uint32_t TotalSize, FreeSpace;
+  char RW_Buffer[200]; 
+  
+  do {
+    // Mount SD Card
+    FR_Status = f_mount(&FatFs, "", 1);
+    if (FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Mounting SD Card, Error Code: (%i)\r\n", FR_Status);
+      break;
+    }
+    sprintf(TxBuffer, "SD Card Mounted Successfully! \r\n\n");
+
+    // Get SD card size and free space
+    f_getfree("", &FreeClusters, &FS_Ptr);
+    TotalSize = (uint32_t)((FS_Ptr->n_fatent - 2) * FS_Ptr->csize * 0.5);
+    FreeSpace = (uint32_t)(FreeClusters * FS_Ptr->csize * 0.5);
+
+    // Create and open csv file
+    FR_Status = f_open(&Fil, "test.csv", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
+    if(FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Creating/Opening A New Text File, Error Code: (%i)\r\n", FR_Status);
+      break;
+    }
+
+    // Write headers
+    f_puts("time_ms,acc_x,acc_y,acc_z\n", &Fil); //\n move cursor to front, new line
+
+    // Write data, sprintf to convert string to floats
+    sprintf(RW_Buffer, "%.1d, %.2f, %.2f, %.2f\n", 34, 12.3, 1.5, 4.7);
+    f_write(&Fil, RW_Buffer, strlen(RW_Buffer), &WWC);
+
+    // Close file, else last chunk of data doesnt get flushed, file size stays at 0 etc. data corrupted
+    f_close(&Fil);
+  } while(0);
+
+  // Unmount SD card
+  FR_Status = f_mount(NULL, "", 0);
+  
+}
+
+static void SD_Card_Test(void) // static means can only be used in this file, you can have the same name function in other files
 {
   FATFS FatFs;
   FIL Fil;
@@ -369,7 +422,7 @@ static void SD_Card_Test(void)
         // UART_Print(TxBuffer);
     }
     */
-  } while(0);
+  } while(0); // keep false so program continues
   //------------------[ Test Complete! Unmount The SD Card ]--------------------
   FR_Status = f_mount(NULL, "", 0);
   if (FR_Status != FR_OK)

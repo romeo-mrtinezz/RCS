@@ -85,11 +85,13 @@ set(MX_LINK_LIBS
 add_library(stm32cubemx INTERFACE)
 target_include_directories(stm32cubemx INTERFACE ${MX_Include_Dirs})
 target_compile_definitions(stm32cubemx INTERFACE ${MX_Defines_Syms})
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wno-unused)
 
 # Create STM32_Drivers static library
 add_library(STM32_Drivers OBJECT)
 target_sources(STM32_Drivers PRIVATE ${STM32_Drivers_Src})
 target_link_libraries(STM32_Drivers PUBLIC stm32cubemx)
+target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -u _printf_float)
 
 
 # Create FatFs static library
