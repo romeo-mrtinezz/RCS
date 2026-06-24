@@ -29,9 +29,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "sd_functions.h"
-#include "sd_benchmark.h"
-
+#include <stdbool.h>
+#include <string.h>
 
 /* USER CODE END Includes */
 
@@ -53,8 +52,6 @@
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
-DMA_HandleTypeDef hdma_spi2_rx;
-DMA_HandleTypeDef hdma_spi2_tx;
 
 TIM_HandleTypeDef htim1;
 
@@ -62,17 +59,18 @@ PCD_HandleTypeDef hpcd_USB_FS;
 
 /* USER CODE BEGIN PV */
 uint8_t byte_2;
+char TxBuffer[250]; // 250 bytes, char is 1 byte
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_USB_PCD_Init(void);
+static void SD_Card_Test(void);
 /* USER CODE BEGIN PFP */
 void run_blinky() {
   // Use function in while loop
@@ -222,7 +220,6 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_SPI1_Init();
   MX_SPI2_Init();
   MX_TIM1_Init();
@@ -241,13 +238,7 @@ int main(void)
   AccData accel_data;
   GyroData gyro_data;
 
-  // SD card variables --------------------------------------
-  uint8_t bufr[80]; // store data read from sd card file
-  UINT br; // store number of bytes read from file
-
-  sd_mount();
-  sd_list_files();
-  sd_unmount();
+  SD_Card_Test();
 
   /* USER CODE END 2 */
 
@@ -255,21 +246,21 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    accel_data = accel_burst_read(ACC_X_LSB);
-    gyro_data = gyro_burst_read(ADDR_RATE_X_LSB);
+    // accel_data = accel_burst_read(ACC_X_LSB);
+    // gyro_data = gyro_burst_read(ADDR_RATE_X_LSB);
     
-    if (accel_data.acc_y > 450) {
-      TIM1->CCR1 = 0; // solenoid 1 duty cycle 0
-      TIM1->CCR2 = 5000; // solenoid 2 duty cycle 50%
-    }
-    else if (accel_data.acc_y < -450) {
-      TIM1->CCR2 = 0;
-      TIM1->CCR1 = 5000;
-    }
-    else if (-450 <= accel_data.acc_y || 450 >= accel_data.acc_y) {
-      TIM1->CCR1 = 0;
-      TIM1->CCR2 = 0;
-    }
+    // if (accel_data.acc_y > 450) {
+    //   TIM1->CCR1 = 0; // solenoid 1 duty cycle 0
+    //   TIM1->CCR2 = 5000; // solenoid 2 duty cycle 50%
+    // }
+    // else if (accel_data.acc_y < -450) {
+    //   TIM1->CCR2 = 0;
+    //   TIM1->CCR1 = 5000;
+    // }
+    // else if (-450 <= accel_data.acc_y || 450 >= accel_data.acc_y) {
+    //   TIM1->CCR1 = 0;
+    //   TIM1->CCR2 = 0;
+    // }
 
 
     // gyro_spi_read(GYRO_CHIP_ID); 
@@ -279,6 +270,116 @@ int main(void)
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
+}
+static void SD_Card_Test(void)
+{
+  FATFS FatFs;
+  FIL Fil;
+  FRESULT FR_Status;
+  FATFS *FS_Ptr;
+  UINT RWC, WWC; // Read/Write Word Counter
+  DWORD FreeClusters;
+  uint32_t TotalSize, FreeSpace;
+  char RW_Buffer[200];
+  do
+  {
+    //------------------[ Mount The SD Card ]--------------------
+    FR_Status = f_mount(&FatFs, "", 1);
+    if (FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Mounting SD Card, Error Code: (%i)\r\n", FR_Status);
+      // UART_Print(TxBuffer);
+      break;
+    }
+    sprintf(TxBuffer, "SD Card Mounted Successfully! \r\n\n");
+    // UART_Print(TxBuffer);
+    //------------------[ Get & Print The SD Card Size & Free Space ]--------------------
+    f_getfree("", &FreeClusters, &FS_Ptr);
+    TotalSize = (uint32_t)((FS_Ptr->n_fatent - 2) * FS_Ptr->csize * 0.5);
+    FreeSpace = (uint32_t)(FreeClusters * FS_Ptr->csize * 0.5);
+    sprintf(TxBuffer, "Total SD Card Size: %lu Bytes\r\n", TotalSize);
+    // UART_Print(TxBuffer);
+    sprintf(TxBuffer, "Free SD Card Space: %lu Bytes\r\n\n", FreeSpace);
+    // UART_Print(TxBuffer);
+    //------------------[ Open A Text File For Write & Write Data ]--------------------
+    //Open the file
+    FR_Status = f_open(&Fil, "TextFileWrite.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
+    if(FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Creating/Opening A New Text File, Error Code: (%i)\r\n", FR_Status);
+      // UART_Print(TxBuffer);
+      break;
+    }
+    sprintf(TxBuffer, "Text File Created & Opened! Writing Data To The Text File..\r\n\n");
+    // UART_Print(TxBuffer);
+    // (1) Write Data To The Text File [ Using f_puts() Function ]
+    f_puts("Hello! From STM32 To SD Card Over SPI, Using f_puts()\n", &Fil);
+    // (2) Write Data To The Text File [ Using f_write() Function ]
+    strcpy(RW_Buffer, "Hello! From STM32 To SD Card Over SPI, Using f_write()\r\n");
+    f_write(&Fil, RW_Buffer, strlen(RW_Buffer), &WWC);
+    // Close The File
+    f_close(&Fil);
+    //------------------[ Open A Text File For Read & Read Its Data ]--------------------
+    // Open The File
+    FR_Status = f_open(&Fil, "TextFileWrite.txt", FA_READ);
+    if(FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Opening (TextFileWrite.txt) File For Read.. \r\n");
+      // UART_Print(TxBuffer);
+      break;
+    }
+    // (1) Read The Text File's Data [ Using f_gets() Function ]
+    f_gets(RW_Buffer, sizeof(RW_Buffer), &Fil);
+    sprintf(TxBuffer, "Data Read From (TextFileWrite.txt) Using f_gets():%s", RW_Buffer);
+    // UART_Print(TxBuffer);
+    // (2) Read The Text File's Data [ Using f_read() Function ]
+    f_read(&Fil, RW_Buffer, f_size(&Fil), &RWC);
+    sprintf(TxBuffer, "Data Read From (TextFileWrite.txt) Using f_read():%s", RW_Buffer);
+    // UART_Print(TxBuffer);
+    // Close The File
+    f_close(&Fil);
+    sprintf(TxBuffer, "File Closed! \r\n\n");
+    // UART_Print(TxBuffer);
+    //------------------[ Open An Existing Text File, Update Its Content, Read It Back ]--------------------
+    // (1) Open The Existing File For Write (Update)
+    FR_Status = f_open(&Fil, "TextFileWrite.txt", FA_OPEN_EXISTING | FA_WRITE);
+    FR_Status = f_lseek(&Fil, f_size(&Fil)); // Move The File Pointer To The EOF (End-Of-File)
+    if(FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Opening (TextFileWrite.txt) File For Update.. \r\n");
+      // UART_Print(TxBuffer);
+      break;
+    }
+    // (2) Write New Line of Text Data To The File
+    FR_Status = f_puts("This New Line Was Added During Update!\r\n", &Fil);
+    f_close(&Fil);
+    memset(RW_Buffer,'\0',sizeof(RW_Buffer)); // Clear The Buffer
+    // (3) Read The Contents of The Text File After The Update
+    FR_Status = f_open(&Fil, "TextFileWrite.txt", FA_READ); // Open The File For Read
+    f_read(&Fil, RW_Buffer, f_size(&Fil), &RWC);
+    sprintf(TxBuffer, "Data Read From (TextFileWrite.txt) After Update:%s", RW_Buffer);
+    // UART_Print(TxBuffer);
+    f_close(&Fil);
+    //------------------[ Delete The Text File ]--------------------
+    // Delete The File
+    /*
+    FR_Status = f_unlink(TextFileWrite.txt);
+    if (FR_Status != FR_OK){
+        sprintf(TxBuffer, "Error! While Deleting The (TextFileWrite.txt) File.. \r\n");
+        // UART_Print(TxBuffer);
+    }
+    */
+  } while(0);
+  //------------------[ Test Complete! Unmount The SD Card ]--------------------
+  FR_Status = f_mount(NULL, "", 0);
+  if (FR_Status != FR_OK)
+  {
+      sprintf(TxBuffer, "Error! While Un-mounting SD Card, Error Code: (%i)\r\n", FR_Status);
+      // UART_Print(TxBuffer);
+  } else{
+      sprintf(TxBuffer, "SD Card Un-mounted Successfully! \r\n");
+      // UART_Print(TxBuffer);
+  }
 }
 
 /**
@@ -531,26 +632,6 @@ static void MX_USB_PCD_Init(void)
   /* USER CODE BEGIN USB_Init 2 */
 
   /* USER CODE END USB_Init 2 */
-
-}
-
-/**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMAMUX1_CLK_ENABLE();
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Channel1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-  /* DMA1_Channel2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
 
 }
 
