@@ -186,6 +186,31 @@ GyroData gyro_burst_read(uint8_t first_address) {
   return gyro_data;
 };
 
+void pwm_logic(float acc_y) {
+
+  if (acc_y > 200 && acc_y <= 450) {
+    TIM1->CCR1 = 0; 
+    TIM1->CCR2 = 2500;     
+  }
+  else if (acc_y > 450) {
+    TIM1->CCR1 = 0; 
+    TIM1->CCR2 = 5000;     
+  }
+  else if (acc_y <= 200 && acc_y >= -200) {
+    TIM1->CCR1 = 0;
+    TIM1->CCR2 = 0;   
+  }
+  else if (acc_y < -200 && acc_y >= -450) {
+    TIM1->CCR1 = 2500; 
+    TIM1->CCR2 = 0; 
+  }
+  else if (acc_y < -450) {
+    TIM1->CCR1 = 5000; 
+    TIM1->CCR2 = 0; 
+  }
+
+}
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -241,7 +266,7 @@ int main(void)
   GyroData gyro_data;
 
   // SD_Card_Test();
-  SD_Card_Write();
+  // SD_Card_Write();
 
   /* USER CODE END 2 */
 
@@ -249,21 +274,10 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    // accel_data = accel_burst_read(ACC_X_LSB);
-    // gyro_data = gyro_burst_read(ADDR_RATE_X_LSB);
+     accel_data = accel_burst_read(ACC_X_LSB);
+    gyro_data = gyro_burst_read(ADDR_RATE_X_LSB);
     
-    // if (accel_data.acc_y > 450) {
-    //   TIM1->CCR1 = 0; // solenoid 1 duty cycle 0
-    //   TIM1->CCR2 = 5000; // solenoid 2 duty cycle 50%
-    // }
-    // else if (accel_data.acc_y < -450) {
-    //   TIM1->CCR2 = 0;
-    //   TIM1->CCR1 = 5000;
-    // }
-    // else if (-450 <= accel_data.acc_y || 450 >= accel_data.acc_y) {
-    //   TIM1->CCR1 = 0;
-    //   TIM1->CCR2 = 0;
-    // }
+    pwm_logic(accel_data.acc_y);
 
 
     // gyro_spi_read(GYRO_CHIP_ID); 
