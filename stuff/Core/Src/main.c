@@ -1,275 +1,158 @@
-/* USER CODE BEGIN Header */
-/**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
-/* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
+/*
+ * LAB Name: STM32 SD Card SPI Interfacing Example
+ * Author: Khaled Magdy
+ * For More Info Visit: www.DeepBlueMbedded.com
+*/
 #include "main.h"
 #include "app_fatfs.h"
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-#include "bmi088.h"
-#include "stm32g483xx.h"
-#include "stm32g4xx_hal_gpio.h"
-#include "stm32g4xx_hal_spi.h"
-#include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
-
-
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
-
-/* Private variables ---------------------------------------------------------*/
-SPI_HandleTypeDef hspi1;
+#include <string.h>
+ 
+// SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
-DMA_HandleTypeDef hdma_spi2_rx;
-DMA_HandleTypeDef hdma_spi2_tx;
 
-TIM_HandleTypeDef htim1;
-
-PCD_HandleTypeDef hpcd_USB_FS;
-
-/* USER CODE BEGIN PV */
-uint8_t byte_2;
-
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
+// UART_HandleTypeDef huart1;
+char TxBuffer[250];
+ 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
-static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
-static void MX_TIM1_Init(void);
-static void MX_USB_PCD_Init(void);
-/* USER CODE BEGIN PFP */
-void run_blinky() {
-  // Use function in while loop
-  HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_SET);
-  HAL_Delay(1000);
-  HAL_GPIO_WritePin(GPIOA, RED_LED_Pin, GPIO_PIN_RESET);
-  HAL_Delay(1000);
-};
+// static void MX_USART1_UART_Init(void);
+static void SD_Card_Test(void);
  
-void gyro_spi_read(uint8_t address) {
-  // Calculate byte 1 from address and R command
-  uint8_t byte_1 = address | 0x80;
-
-  // 1. Send address and R command
-  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_RESET); // Chip select low
-  // HAL_Delay(100);
-  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
-  // HAL_Delay(100);
-
-  // 2. Read data
-  HAL_SPI_Receive(&hspi1, &byte_2, BYTE_SIZE, TIMEOUT);
-  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_SET);  // End comms
-  // don't have to return anything because we passed in address of byte 2
-};
-
-
-uint8_t initialise_accel() {
-  uint8_t byte_1 = ACC_PWR_CTRL | 0x00; // Write mode
-  uint8_t pwr_set = 0x04;
-  uint8_t accel_id;
-  uint8_t dummy;
-
-  // 1. Switch to spi mode
-  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // rising edge to switch to spi
-  // HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_SET); // deselect gyro
-
-  // 2. Switch from suspend mode to normal power mode
-  HAL_Delay(1);
-  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_RESET);
-  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
-  HAL_SPI_Transmit(&hspi1, &pwr_set, BYTE_SIZE, TIMEOUT); // Send byte 1
-  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); 
-  HAL_Delay(1);
-
-  // 3. Read accel id
-  byte_1 = ACC_CHIP_ID | 0x80;
-  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_RESET); // pull cs low
-  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
-  HAL_SPI_Receive(&hspi1, &dummy, BYTE_SIZE, TIMEOUT); // dummy
-  HAL_SPI_Receive(&hspi1, &accel_id, BYTE_SIZE, TIMEOUT);
-  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // end transaction
-  
-  return accel_id; // expect 0x1E = 30 
-};
-
-uint8_t accel_spi_read(uint8_t address) {
-  uint8_t result;
-  uint8_t dummy;
-
-  uint8_t byte_1 = address | 0x80; // R mode
-  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_RESET); // pull cs low
-  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
-  HAL_SPI_Receive(&hspi1, &dummy, BYTE_SIZE, TIMEOUT); // dummy
-  HAL_SPI_Receive(&hspi1, &result, BYTE_SIZE, TIMEOUT);
-  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // end transaction
-  
-  return result; 
-};
-
-/** 
-  * @brief read all 3 axis at once
-  * @param first_address
-  * @retval None
-*/
-AccData accel_burst_read(uint8_t first_address) {
-  uint8_t dummy;
-  uint8_t byte_1 = first_address | 0x80; // R mode
-  uint8_t acc_buffer[6]; // 6 bytes of data
-  AccData accel_data;
-
-  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_RESET); // pull cs low
-  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT); // Send byte 1
-  HAL_SPI_Receive(&hspi1, &dummy, BYTE_SIZE, TIMEOUT); // dummy
-  HAL_SPI_Receive(&hspi1, acc_buffer, sizeof(acc_buffer), TIMEOUT);
-  HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_SET); // end transaction
-
-  // cast to int due to 2's complement
-  // default acc_range 0x01, +-6g
-  // Accel in mg
-  accel_data.acc_x = (int16_t)(acc_buffer[1] << 8 | acc_buffer[0])/32768.0f * 1000.0f * 4.0f * 1.5f; // msb*256+lsb 
-  accel_data.acc_y = (int16_t)(acc_buffer[3] << 8 | acc_buffer[2])/32768.0f * 1000.0f * 4.0f * 1.5f;
-  accel_data.acc_z = (int16_t)(acc_buffer[5] << 8 | acc_buffer[4])/32768.0f * 1000.0f * 4.0f * 1.5f;
-
-  return accel_data;
-};
-
-GyroData gyro_burst_read(uint8_t first_address) {
-  uint8_t byte_1 = first_address | 0x80; // R mode
-  uint8_t gyro_buffer[6]; // 6 bytes of data
-  GyroData gyro_data;
-
-  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_RESET);
-  HAL_SPI_Transmit(&hspi1, &byte_1, BYTE_SIZE, TIMEOUT);
-  HAL_SPI_Receive(&hspi1, gyro_buffer, sizeof(gyro_buffer), TIMEOUT);
-  HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_SET);
-
-  gyro_data.rate_x = (int16_t)(gyro_buffer[1] << 8 | gyro_buffer[0]) * 0.061f;
-  gyro_data.rate_y = (int16_t)(gyro_buffer[3] << 8 | gyro_buffer[2]) * 0.061f;
-  gyro_data.rate_z = (int16_t)(gyro_buffer[5] << 8 | gyro_buffer[4]) * 0.061f;
-
-  return gyro_data;
-};
-
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-
-/* USER CODE END 0 */
-
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
+// static void UART_Print(char* str)
+// {
+//     HAL_UART_Transmit(&huart1, (uint8_t *) str, strlen(str), 100);
+// }
+ 
 int main(void)
 {
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
   SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
-  MX_SPI1_Init();
   MX_SPI2_Init();
-  MX_TIM1_Init();
-  MX_USB_PCD_Init();
-  if (MX_FATFS_Init() != APP_OK) {
-    Error_Handler();
+  // MX_USART1_UART_Init();
+  MX_FATFS_Init();
+ 
+  //Test The SD Card
+  SD_Card_Test();
+ 
+  while(1)
+  {
+      // Nothing To Do Here!
   }
-  /* USER CODE BEGIN 2 */
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
-
-  TIM1->CCR1 = 0; // 50% duty cycle for ARR = 10,000
-  TIM1->CCR2 = 0;
-
-  byte_2 = initialise_accel();
-  AccData accel_data;
-  GyroData gyro_data;
-
-  // SD card variables --------------------------------------
-
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  { 
-    accel_data = accel_burst_read(ACC_X_LSB);
-    gyro_data = gyro_burst_read(ADDR_RATE_X_LSB);
-    
-    if (accel_data.acc_y > 450) {
-      TIM1->CCR1 = 0; // solenoid 1 duty cycle 0
-      TIM1->CCR2 = 5000; // solenoid 2 duty cycle 50%
+}
+ 
+static void SD_Card_Test(void)
+{
+  FATFS FatFs;
+  FIL Fil;
+  FRESULT FR_Status;
+  FATFS *FS_Ptr;
+  UINT RWC, WWC; // Read/Write Word Counter
+  DWORD FreeClusters;
+  uint32_t TotalSize, FreeSpace;
+  char RW_Buffer[200];
+  do
+  {
+    //------------------[ Mount The SD Card ]--------------------
+    FR_Status = f_mount(&FatFs, "", 1);
+    if (FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Mounting SD Card, Error Code: (%i)\r\n", FR_Status);
+      // UART_Print(TxBuffer);
+      break;
     }
-    else if (accel_data.acc_y < -450) {
-      TIM1->CCR2 = 0;
-      TIM1->CCR1 = 5000;
+    sprintf(TxBuffer, "SD Card Mounted Successfully! \r\n\n");
+    // UART_Print(TxBuffer);
+    //------------------[ Get & Print The SD Card Size & Free Space ]--------------------
+    f_getfree("", &FreeClusters, &FS_Ptr);
+    TotalSize = (uint32_t)((FS_Ptr->n_fatent - 2) * FS_Ptr->csize * 0.5);
+    FreeSpace = (uint32_t)(FreeClusters * FS_Ptr->csize * 0.5);
+    sprintf(TxBuffer, "Total SD Card Size: %lu Bytes\r\n", TotalSize);
+    // UART_Print(TxBuffer);
+    sprintf(TxBuffer, "Free SD Card Space: %lu Bytes\r\n\n", FreeSpace);
+    // UART_Print(TxBuffer);
+    //------------------[ Open A Text File For Write & Write Data ]--------------------
+    //Open the file
+    FR_Status = f_open(&Fil, "TextFileWrite.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
+    if(FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Creating/Opening A New Text File, Error Code: (%i)\r\n", FR_Status);
+      // UART_Print(TxBuffer);
+      break;
     }
-    else if (-450 <= accel_data.acc_y || 450 >= accel_data.acc_y) {
-      TIM1->CCR1 = 0;
-      TIM1->CCR2 = 0;
+    sprintf(TxBuffer, "Text File Created & Opened! Writing Data To The Text File..\r\n\n");
+    // UART_Print(TxBuffer);
+    // (1) Write Data To The Text File [ Using f_puts() Function ]
+    f_puts("Hello! From STM32 To SD Card Over SPI, Using f_puts()\n", &Fil);
+    // (2) Write Data To The Text File [ Using f_write() Function ]
+    strcpy(RW_Buffer, "Hello! From STM32 To SD Card Over SPI, Using f_write()\r\n");
+    f_write(&Fil, RW_Buffer, strlen(RW_Buffer), &WWC);
+    // Close The File
+    f_close(&Fil);
+    //------------------[ Open A Text File For Read & Read Its Data ]--------------------
+    // Open The File
+    FR_Status = f_open(&Fil, "TextFileWrite.txt", FA_READ);
+    if(FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Opening (TextFileWrite.txt) File For Read.. \r\n");
+      // UART_Print(TxBuffer);
+      break;
     }
-
-
-    // gyro_spi_read(GYRO_CHIP_ID); 
-
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
+    // (1) Read The Text File's Data [ Using f_gets() Function ]
+    f_gets(RW_Buffer, sizeof(RW_Buffer), &Fil);
+    sprintf(TxBuffer, "Data Read From (TextFileWrite.txt) Using f_gets():%s", RW_Buffer);
+    // UART_Print(TxBuffer);
+    // (2) Read The Text File's Data [ Using f_read() Function ]
+    f_read(&Fil, RW_Buffer, f_size(&Fil), &RWC);
+    sprintf(TxBuffer, "Data Read From (TextFileWrite.txt) Using f_read():%s", RW_Buffer);
+    // UART_Print(TxBuffer);
+    // Close The File
+    f_close(&Fil);
+    sprintf(TxBuffer, "File Closed! \r\n\n");
+    // UART_Print(TxBuffer);
+    //------------------[ Open An Existing Text File, Update Its Content, Read It Back ]--------------------
+    // (1) Open The Existing File For Write (Update)
+    FR_Status = f_open(&Fil, "TextFileWrite.txt", FA_OPEN_EXISTING | FA_WRITE);
+    FR_Status = f_lseek(&Fil, f_size(&Fil)); // Move The File Pointer To The EOF (End-Of-File)
+    if(FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Opening (TextFileWrite.txt) File For Update.. \r\n");
+      // UART_Print(TxBuffer);
+      break;
+    }
+    // (2) Write New Line of Text Data To The File
+    FR_Status = f_puts("This New Line Was Added During Update!\r\n", &Fil);
+    f_close(&Fil);
+    memset(RW_Buffer,'\0',sizeof(RW_Buffer)); // Clear The Buffer
+    // (3) Read The Contents of The Text File After The Update
+    FR_Status = f_open(&Fil, "TextFileWrite.txt", FA_READ); // Open The File For Read
+    f_read(&Fil, RW_Buffer, f_size(&Fil), &RWC);
+    sprintf(TxBuffer, "Data Read From (TextFileWrite.txt) After Update:%s", RW_Buffer);
+    // UART_Print(TxBuffer);
+    f_close(&Fil);
+    //------------------[ Delete The Text File ]--------------------
+    // Delete The File
+    /*
+    FR_Status = f_unlink(TextFileWrite.txt);
+    if (FR_Status != FR_OK){
+        sprintf(TxBuffer, "Error! While Deleting The (TextFileWrite.txt) File.. \r\n");
+        // UART_Print(TxBuffer);
+    }
+    */
+  } while(0);
+  //------------------[ Test Complete! Unmount The SD Card ]--------------------
+  FR_Status = f_mount(NULL, "", 0);
+  if (FR_Status != FR_OK)
+  {
+      sprintf(TxBuffer, "Error! While Un-mounting SD Card, Error Code: (%i)\r\n", FR_Status);
+      // UART_Print(TxBuffer);
+  } else{
+      sprintf(TxBuffer, "SD Card Un-mounted Successfully! \r\n");
+      // UART_Print(TxBuffer);
   }
-  /* USER CODE END 3 */
 }
 
 /**
@@ -323,40 +206,40 @@ void SystemClock_Config(void)
   * @param None
   * @retval None
   */
-static void MX_SPI1_Init(void)
-{
+// static void MX_SPI1_Init(void)
+// {
 
-  /* USER CODE BEGIN SPI1_Init 0 */
+//   /* USER CODE BEGIN SPI1_Init 0 */
 
-  /* USER CODE END SPI1_Init 0 */
+//   /* USER CODE END SPI1_Init 0 */
 
-  /* USER CODE BEGIN SPI1_Init 1 */
+//   /* USER CODE BEGIN SPI1_Init 1 */
 
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 7;
-  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
+//   /* USER CODE END SPI1_Init 1 */
+//   /* SPI1 parameter configuration*/
+//   hspi1.Instance = SPI1;
+//   hspi1.Init.Mode = SPI_MODE_MASTER;
+//   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+//   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+//   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+//   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+//   hspi1.Init.NSS = SPI_NSS_SOFT;
+//   hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+//   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+//   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+//   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+//   hspi1.Init.CRCPolynomial = 7;
+//   hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+//   hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+//   if (HAL_SPI_Init(&hspi1) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   /* USER CODE BEGIN SPI1_Init 2 */
 
-  /* USER CODE END SPI1_Init 2 */
+//   /* USER CODE END SPI1_Init 2 */
 
-}
+// }
 
 /**
   * @brief SPI2 Initialization Function
@@ -403,147 +286,147 @@ static void MX_SPI2_Init(void)
   * @param None
   * @retval None
   */
-static void MX_TIM1_Init(void)
-{
+// static void MX_TIM1_Init(void)
+// {
 
-  /* USER CODE BEGIN TIM1_Init 0 */
+//   /* USER CODE BEGIN TIM1_Init 0 */
 
-  /* USER CODE END TIM1_Init 0 */
+//   /* USER CODE END TIM1_Init 0 */
 
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
-  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+//   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+//   TIM_MasterConfigTypeDef sMasterConfig = {0};
+//   TIM_OC_InitTypeDef sConfigOC = {0};
+//   TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
 
-  /* USER CODE BEGIN TIM1_Init 1 */
+//   /* USER CODE BEGIN TIM1_Init 1 */
 
-  /* USER CODE END TIM1_Init 1 */
-  htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 160-1;
-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 9999;
-  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
-  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
-  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
-  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
-  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
-  sBreakDeadTimeConfig.DeadTime = 0;
-  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
-  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
-  sBreakDeadTimeConfig.BreakFilter = 0;
-  sBreakDeadTimeConfig.BreakAFMode = TIM_BREAK_AFMODE_INPUT;
-  sBreakDeadTimeConfig.Break2State = TIM_BREAK2_DISABLE;
-  sBreakDeadTimeConfig.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
-  sBreakDeadTimeConfig.Break2Filter = 0;
-  sBreakDeadTimeConfig.Break2AFMode = TIM_BREAK_AFMODE_INPUT;
-  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
-  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM1_Init 2 */
+//   /* USER CODE END TIM1_Init 1 */
+//   htim1.Instance = TIM1;
+//   htim1.Init.Prescaler = 160-1;
+//   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+//   htim1.Init.Period = 9999;
+//   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+//   htim1.Init.RepetitionCounter = 0;
+//   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+//   if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+//   if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+//   sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+//   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+//   if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   sConfigOC.OCMode = TIM_OCMODE_PWM1;
+//   sConfigOC.Pulse = 0;
+//   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+//   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+//   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+//   sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+//   sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+//   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+//   sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+//   sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+//   sBreakDeadTimeConfig.DeadTime = 0;
+//   sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+//   sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+//   sBreakDeadTimeConfig.BreakFilter = 0;
+//   sBreakDeadTimeConfig.BreakAFMode = TIM_BREAK_AFMODE_INPUT;
+//   sBreakDeadTimeConfig.Break2State = TIM_BREAK2_DISABLE;
+//   sBreakDeadTimeConfig.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
+//   sBreakDeadTimeConfig.Break2Filter = 0;
+//   sBreakDeadTimeConfig.Break2AFMode = TIM_BREAK_AFMODE_INPUT;
+//   sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+//   if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   /* USER CODE BEGIN TIM1_Init 2 */
 
-  /* USER CODE END TIM1_Init 2 */
-  HAL_TIM_MspPostInit(&htim1);
+//   /* USER CODE END TIM1_Init 2 */
+//   HAL_TIM_MspPostInit(&htim1);
 
-}
+// }
 
 /**
   * @brief USB Initialization Function
   * @param None
   * @retval None
   */
-static void MX_USB_PCD_Init(void)
-{
+// static void MX_USB_PCD_Init(void)
+// {
 
-  /* USER CODE BEGIN USB_Init 0 */
+//   /* USER CODE BEGIN USB_Init 0 */
 
-  /* USER CODE END USB_Init 0 */
+//   /* USER CODE END USB_Init 0 */
 
-  /* USER CODE BEGIN USB_Init 1 */
+//   /* USER CODE BEGIN USB_Init 1 */
 
-  /* USER CODE END USB_Init 1 */
-  hpcd_USB_FS.Instance = USB;
-  hpcd_USB_FS.Init.dev_endpoints = 8;
-  hpcd_USB_FS.Init.speed = PCD_SPEED_FULL;
-  hpcd_USB_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
-  hpcd_USB_FS.Init.Sof_enable = DISABLE;
-  hpcd_USB_FS.Init.low_power_enable = DISABLE;
-  hpcd_USB_FS.Init.lpm_enable = DISABLE;
-  hpcd_USB_FS.Init.battery_charging_enable = DISABLE;
-  if (HAL_PCD_Init(&hpcd_USB_FS) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USB_Init 2 */
+//   /* USER CODE END USB_Init 1 */
+//   hpcd_USB_FS.Instance = USB;
+//   hpcd_USB_FS.Init.dev_endpoints = 8;
+//   hpcd_USB_FS.Init.speed = PCD_SPEED_FULL;
+//   hpcd_USB_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
+//   hpcd_USB_FS.Init.Sof_enable = DISABLE;
+//   hpcd_USB_FS.Init.low_power_enable = DISABLE;
+//   hpcd_USB_FS.Init.lpm_enable = DISABLE;
+//   hpcd_USB_FS.Init.battery_charging_enable = DISABLE;
+//   if (HAL_PCD_Init(&hpcd_USB_FS) != HAL_OK)
+//   {
+//     Error_Handler();
+//   }
+//   /* USER CODE BEGIN USB_Init 2 */
 
-  /* USER CODE END USB_Init 2 */
+//   /* USER CODE END USB_Init 2 */
 
-}
+// }
 
 /**
   * Enable DMA controller clock
   */
-static void MX_DMA_Init(void)
-{
+// static void MX_DMA_Init(void)
+// {
 
-  /* DMA controller clock enable */
-  __HAL_RCC_DMAMUX1_CLK_ENABLE();
-  __HAL_RCC_DMA1_CLK_ENABLE();
+//   /* DMA controller clock enable */
+//   __HAL_RCC_DMAMUX1_CLK_ENABLE();
+//   __HAL_RCC_DMA1_CLK_ENABLE();
 
-  /* DMA interrupt init */
-  /* DMA1_Channel1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-  /* DMA1_Channel2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
+//   /* DMA interrupt init */
+//   /* DMA1_Channel1_IRQn interrupt configuration */
+//   HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+//   HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+//   /* DMA1_Channel2_IRQn interrupt configuration */
+//   HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
+//   HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
 
-}
+// }
 
 /**
   * @brief GPIO Initialization Function
