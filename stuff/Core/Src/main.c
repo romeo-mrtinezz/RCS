@@ -24,6 +24,8 @@
 /* USER CODE BEGIN Includes */
 #include "bmi088.h"
 #include "ff.h"
+#include "pid.h"
+
 #include "stm32g483xx.h"
 #include "stm32g4xx_hal_gpio.h"
 #include "stm32g4xx_hal_spi.h"
@@ -274,11 +276,10 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-     accel_data = accel_burst_read(ACC_X_LSB);
+    accel_data = accel_burst_read(ACC_X_LSB);
     gyro_data = gyro_burst_read(ADDR_RATE_X_LSB);
     
-    pwm_logic(accel_data.acc_y);
-
+    // pwm_logic(accel_data.acc_y);
 
     // gyro_spi_read(GYRO_CHIP_ID); 
 
