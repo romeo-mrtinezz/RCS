@@ -23,18 +23,18 @@ because it would for the varying duty cycles to take effect
 */
 
 #include "PID.h"
-#include "stm32g4xx_hal_tim.h"
+#include "main.h"
 // extern TIM_HandleTypeDef htim1;
 
 // Just 1 axis for now
-int comp_filter(float alpha, int dt, int prev_pitch, float gyro_rate, float accel_angle) {
-    int pitch = alpha*(prev_pitch + gyro_rate * dt) + (1-alpha)*accel_angle;
-    return pitch
+float comp_filter(float alpha, int dt, float prev_angle, float gyro_rate, float accel_angle) {
+    float angle = alpha*(prev_angle + gyro_rate * dt) + (1-alpha)*accel_angle;
+    return angle;
 }
 
 // pass in pointer to pid so we can update them directly instead of making 100 copies
 void pid_init(PID_params *pid) {
-    pid->Kp = 1, pid->Ki = 0, pid->Kd = 0;
+    pid->Kp = 800, pid->Ki = 0, pid->Kd = 0;
     pid -> integral = 0;
     pid -> prev_error = 0;
     pid->min_duty = 3800, pid->max_duty = 6200; // Duty cycle max
@@ -42,10 +42,11 @@ void pid_init(PID_params *pid) {
 
 float pid_update(PID_params *pid, float set_point, float angle_estimate, float dt) {
     float error = set_point - angle_estimate;
+    pid->error = error;
     pid->integral += error*dt;
 
-    float P = pid->kp*error;
-    float I = pid->ki*pid->integral
+    float P = pid->Kp*error;
+    float I = pid->Ki*pid->integral;
     float D = (error-pid->prev_error)/dt;
     pid->prev_error = error;
 
@@ -62,18 +63,19 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
         pid->integral -= error*dt;
     }
     
-    return (uint16_t)control // CCR has to be uint16_t
+    return (uint16_t)control; // CCR has to be uint16_t
 }   
 
 void select_thruster(float pitch_error, float pitch_duty, float yaw_error, float yaw_duty, float dt) {
     // map PWM to total impulse desired? thrust*seconds. maybe not needed tbh.
     // just use this to choose which thruster to fire
-    if (pitch_error < 0) {
+    int ACCEPTABLE = 10; // degrees?
+    if (pitch_error < -ACCEPTABLE) {
         // actuate pitch thruster in +ve
         TIM1->CCR1 = pitch_duty; 
         TIM1->CCR2 = 0; // make sure only 1 actuated in the same axis
     }
-    else if (pitch_error > 0 ) {
+    else if (pitch_error > ACCEPTABLE ) {
         // actuate pitch thruster in -ve direction
         TIM1->CCR1 = 0;
         TIM1->CCR2 = pitch_duty;
@@ -84,12 +86,12 @@ void select_thruster(float pitch_error, float pitch_duty, float yaw_error, float
         TIM1->CCR2 = 0;        
     }
 
-    if (yaw_error < 0) {
+    if (yaw_error < -ACCEPTABLE) {
         // actuate yaw thruster in +ve
         TIM1->CCR3 = yaw_duty;
         TIM1->CCR4 = 0; 
     }
-    else if (yaw_error > 0 ) {
+    else if (yaw_error > ACCEPTABLE ) {
         // actuate yaw thruster in -ve direction
         TIM1->CCR3 = 0;
         TIM1->CCR4 = yaw_duty; 

@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "pid.h"
 #include "app_fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -27,6 +28,7 @@
 #include "pid.h"
 
 #include "stm32g483xx.h"
+#include "stm32g4xx_hal.h"
 #include "stm32g4xx_hal_gpio.h"
 #include "stm32g4xx_hal_spi.h"
 #include <stdint.h>
@@ -34,6 +36,7 @@
 
 #include <stdbool.h>
 #include <string.h>
+#include <math.h>
 
 /* USER CODE END Includes */
 
@@ -181,7 +184,7 @@ GyroData gyro_burst_read(uint8_t first_address) {
   HAL_SPI_Receive(&hspi1, gyro_buffer, sizeof(gyro_buffer), TIMEOUT);
   HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_SET);
 
-  gyro_data.rate_x = (int16_t)(gyro_buffer[1] << 8 | gyro_buffer[0]) * 0.061f;
+  gyro_data.rate_x = (int16_t)(gyro_buffer[1] << 8 | gyro_buffer[0]) * 0.061f; // deg/sec
   gyro_data.rate_y = (int16_t)(gyro_buffer[3] << 8 | gyro_buffer[2]) * 0.061f;
   gyro_data.rate_z = (int16_t)(gyro_buffer[5] << 8 | gyro_buffer[4]) * 0.061f;
 
@@ -213,6 +216,13 @@ void pwm_logic(float acc_y) {
 
 }
 
+void accel_to_angle(AccData accel_data, float * accel_pitch, float * accel_yaw) {
+  *accel_pitch = (float)atan2(accel_data.acc_x, accel_data.acc_z); // shouldn't matter if in mg
+  *accel_yaw = (float)atan2(accel_data.acc_y, accel_data.acc_z); // radians
+  
+  *accel_pitch = *accel_pitch * 180.0f/M_PI; // degrees
+  *accel_yaw = *accel_yaw * 180.0f/M_PI; 
+};
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -269,7 +279,9 @@ int main(void)
 
   // SD_Card_Test();
   // SD_Card_Write();
-
+  float prev_pitch = 0, prev_yaw = 0;
+  PID_params pid;
+  pid_init(&pid); // bro check ur dereferencing
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -278,6 +290,11 @@ int main(void)
   { 
     accel_data = accel_burst_read(ACC_X_LSB);
     gyro_data = gyro_burst_read(ADDR_RATE_X_LSB);
+    
+    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
+    float pitch = comp_filter(0, 1, prev_pitch, gyro_data.rate_x, accel_pitch); // alpha = 1 means purely based on accel
+    uint16_t pitch_duty = pid_update(&pid, 0, pitch, 1); 
+    select_thruster(pid.error, pitch_duty, 0, 0, 1);
     
     // pwm_logic(accel_data.acc_y);
 

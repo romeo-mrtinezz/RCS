@@ -49,6 +49,7 @@ int main() {
         comp_filter(gyro_data, accel_data, timestamp?);
         run_pid_alg();
         pwm_logic();
+        log_to_sd();
     }
 
 }

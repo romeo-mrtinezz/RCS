@@ -83,5 +83,10 @@ typedef struct {
     float acc_z;
 } AccData;
 
+typedef struct {
+  float pitch;
+  float yaw;
+  int dt;
+} Attitude;
 
 #endif /* __BMI088_H */

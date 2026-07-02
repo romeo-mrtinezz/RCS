@@ -10,10 +10,11 @@ typedef struct {
     float prev_error; 
     float integral;
     float min_duty, max_duty;
+    float error;
 } PID_params;
 
-int comp_filter(float alpha, int dt, int prev_pitch, float gyro_rate, float accel_angle);
+float comp_filter(float alpha, int dt, float prev_angle, float gyro_rate, float accel_angle);
 void pid_init(PID_params *pid); 
 float pid_update(PID_params *pid, float set_point, float angle_estimate, float dt);
-void select_thruster(float pitch_error, float pitch_duty)
+void select_thruster(float pitch_error, float pitch_duty, float yaw_error, float yaw_duty, float dt);
 #endif /*__PID_H*/
