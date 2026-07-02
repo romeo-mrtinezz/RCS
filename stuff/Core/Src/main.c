@@ -279,6 +279,7 @@ int main(void)
 
   // SD_Card_Test();
   // SD_Card_Write();
+  float accel_pitch, accel_yaw;
   float prev_pitch = 0, prev_yaw = 0;
   PID_params pid;
   pid_init(&pid); // bro check ur dereferencing
@@ -297,7 +298,7 @@ int main(void)
     select_thruster(pid.error, pitch_duty, 0, 0, 1);
     
     // pwm_logic(accel_data.acc_y);
-
+    
     // gyro_spi_read(GYRO_CHIP_ID); 
 
     /* USER CODE END WHILE */
