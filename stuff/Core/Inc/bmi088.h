@@ -36,6 +36,13 @@ burst access mechanism which auto-increments the register being read without hav
 #ifndef BMI088_H
 #define BMI088_H
 
+// Includes
+#include "main.h"
+#include "spi.h"
+#include "stm32g483xx.h"
+#include "stm32g4xx_hal_spi.h"
+extern SPI_HandleTypeDef hspi1;
+
 // Gyroscope register map-----------------
 // Read only
 #define GYRO_CHIP_ID         0x00
@@ -88,5 +95,13 @@ typedef struct {
   float yaw;
   int dt;
 } Attitude;
+
+// Functions
+uint8_t gyro_spi_read(uint8_t address);
+uint8_t accel_init();
+uint8_t accel_spi_read(uint8_t address);
+void accel_burst_read(uint8_t first_address, AccData * accel_data);
+void gyro_burst_read(uint8_t first_address, GyroData * gyro_data);
+
 
 #endif /* __BMI088_H */

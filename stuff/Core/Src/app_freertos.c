@@ -47,11 +47,32 @@
 /* USER CODE BEGIN Variables */
 
 /* USER CODE END Variables */
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
+/* Definitions for readIMU */
+osThreadId_t readIMUHandle;
+const osThreadAttr_t readIMU_attributes = {
+  .name = "readIMU",
   .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 128 * 4
+};
+/* Definitions for compFilter */
+osThreadId_t compFilterHandle;
+const osThreadAttr_t compFilter_attributes = {
+  .name = "compFilter",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 128 * 4
+};
+/* Definitions for pidUpdate */
+osThreadId_t pidUpdateHandle;
+const osThreadAttr_t pidUpdate_attributes = {
+  .name = "pidUpdate",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 128 * 4
+};
+/* Definitions for selectThruster */
+osThreadId_t selectThrusterHandle;
+const osThreadAttr_t selectThruster_attributes = {
+  .name = "selectThruster",
+  .priority = (osPriority_t) osPriorityLow,
   .stack_size = 128 * 4
 };
 
@@ -60,7 +81,10 @@ const osThreadAttr_t defaultTask_attributes = {
 
 /* USER CODE END FunctionPrototypes */
 
-void StartDefaultTask(void *argument);
+void StartReadIMU(void *argument);
+void StartCompFilter(void *argument);
+void StartPidUpdate(void *argument);
+void StartSelectThruster(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -91,8 +115,17 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  /* creation of readIMU */
+  readIMUHandle = osThreadNew(StartReadIMU, NULL, &readIMU_attributes);
+
+  /* creation of compFilter */
+  compFilterHandle = osThreadNew(StartCompFilter, NULL, &compFilter_attributes);
+
+  /* creation of pidUpdate */
+  pidUpdateHandle = osThreadNew(StartPidUpdate, NULL, &pidUpdate_attributes);
+
+  /* creation of selectThruster */
+  selectThrusterHandle = osThreadNew(StartSelectThruster, NULL, &selectThruster_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -104,22 +137,77 @@ void MX_FREERTOS_Init(void) {
 
 }
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+/* USER CODE BEGIN Header_StartReadIMU */
 /**
-  * @brief  Function implementing the defaultTask thread.
+  * @brief  Function implementing the readIMU thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
+/* USER CODE END Header_StartReadIMU */
+void StartReadIMU(void *argument)
 {
-  /* USER CODE BEGIN StartDefaultTask */
+  /* USER CODE BEGIN StartReadIMU */
   /* Infinite loop */
   for(;;)
   {
     osDelay(1);
   }
-  /* USER CODE END StartDefaultTask */
+  /* USER CODE END StartReadIMU */
+}
+
+/* USER CODE BEGIN Header_StartCompFilter */
+/**
+* @brief Function implementing the compFilter thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCompFilter */
+void StartCompFilter(void *argument)
+{
+  /* USER CODE BEGIN StartCompFilter */
+  /* Infinite loop */
+  for(;;)
+  {
+    // float angle = alpha*(prev_angle + gyro_rate * dt) + (1-alpha)*accel_angle;
+    osDelay(1);
+  }
+  /* USER CODE END StartCompFilter */
+}
+
+/* USER CODE BEGIN Header_StartPidUpdate */
+/**
+* @brief Function implementing the pidUpdate thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartPidUpdate */
+void StartPidUpdate(void *argument)
+{
+  /* USER CODE BEGIN StartPidUpdate */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartPidUpdate */
+}
+
+/* USER CODE BEGIN Header_StartSelectThruster */
+/**
+* @brief Function implementing the selectThruster thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartSelectThruster */
+void StartSelectThruster(void *argument)
+{
+  /* USER CODE BEGIN StartSelectThruster */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartSelectThruster */
 }
 
 /* Private application code --------------------------------------------------*/
