@@ -46,12 +46,12 @@ extern SPI_HandleTypeDef hspi1;
 // Gyroscope register map-----------------
 // Read only
 #define GYRO_CHIP_ID         0x00
-#define ADDR_RATE_X_LSB      0x02 
-#define ADDR_RATE_X_MSB      0x03
-#define ADDR_RATE_Y_LSB      0x04
-#define ADDR_RATE_Y_MSB      0x05
-#define ADDR_RATE_Z_LSB      0x06
-#define ADDR_RATE_Z_MSB      0x07
+#define RATE_X_LSB           0x02 
+#define RATE_X_MSB           0x03
+#define RATE_Y_LSB           0x04
+#define RATE_Y_MSB           0x05
+#define RATE_Z_LSB           0x06
+#define RATE_Z_MSB           0x07
 #define GYRO_INT_STAT_1      0x0A
 #define FIFO_DATA            0x3F
 #define FIFO_STATUS          0x0E
@@ -100,8 +100,8 @@ typedef struct {
 uint8_t gyro_spi_read(uint8_t address);
 uint8_t accel_init();
 uint8_t accel_spi_read(uint8_t address);
-void accel_burst_read(uint8_t first_address, AccData * accel_data);
-void gyro_burst_read(uint8_t first_address, GyroData * gyro_data);
+void accel_burst_read(AccData * accel_data);
+void gyro_burst_read(GyroData * gyro_data);
 
 
 #endif /* __BMI088_H */

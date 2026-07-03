@@ -82,9 +82,9 @@ uint8_t accel_spi_read(uint8_t address) {
   * @param first_address // ACC_X_LSB I think
   * @retval None
 */
-void accel_burst_read(uint8_t first_address, AccData * accel_data) { 
+void accel_burst_read(AccData * accel_data) { 
   uint8_t dummy;
-  uint8_t byte_1 = first_address | 0x80; // R mode
+  uint8_t byte_1 = ACC_X_LSB | 0x80; // R mode
   uint8_t acc_buffer[6]; // 6 bytes of data
 
   HAL_GPIO_WritePin(GPIOC, CS_ACCEL_Pin, GPIO_PIN_RESET); // pull cs low
@@ -101,8 +101,8 @@ void accel_burst_read(uint8_t first_address, AccData * accel_data) {
   accel_data->acc_z = (int16_t)(acc_buffer[5] << 8 | acc_buffer[4])/32768.0f * 1000.0f * 4.0f * 1.5f;
 };
 
-void gyro_burst_read(uint8_t first_address, GyroData * gyro_data) {
-  uint8_t byte_1 = first_address | 0x80; // R mode
+void gyro_burst_read(GyroData * gyro_data) {
+  uint8_t byte_1 = ACC_X_LSB | 0x80; // R mode
   uint8_t gyro_buffer[6]; // 6 bytes of data
 
   HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_RESET);
