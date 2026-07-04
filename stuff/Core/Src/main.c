@@ -52,7 +52,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-extern osMessageQueueId_t messageQueueHandle;
+// extern osMessageQueueId_t messageQueueHandle;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -102,13 +102,10 @@ void accel_to_angle(const AccData accel_data, float * accel_pitch, float * accel
   *accel_pitch = *accel_pitch * 180.0f/M_PI; // degrees
   *accel_yaw = *accel_yaw * 180.0f/M_PI; 
 };
-
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 /* USER CODE END 0 */
 
 /**

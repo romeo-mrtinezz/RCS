@@ -1,4 +1,8 @@
 
+#include "ff.h"
+static FATFS FatFs;
+static FIL Fil;
+
 // typedef struct {
 //     float Kp, Ki, Kd;
 //     float prev_error; 
