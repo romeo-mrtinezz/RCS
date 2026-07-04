@@ -24,6 +24,7 @@ because it would for the varying duty cycles to take effect
 
 #include "PID.h"
 #include "main.h"
+#include "global.h"
 // extern TIM_HandleTypeDef htim1;
 
 // Just 1 axis for now

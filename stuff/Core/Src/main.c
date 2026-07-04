@@ -20,6 +20,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "app_fatfs.h"
+#include "cmsis_os2.h"
 #include "spi.h"
 #include "tim.h"
 #include "usb.h"
@@ -30,6 +31,7 @@
 #include "bmi088.h"
 #include "ff.h"
 #include "pid.h"
+#include "global.h"
 
 #include "stm32g483xx.h"
 #include "stm32g4xx_hal.h"
@@ -46,12 +48,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+extern osMessageQueueId_t MessageQueueHandle;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -62,8 +63,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-char TxBuffer[250]; // 250 bytes, char is 1 byte
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,8 +94,8 @@ void pwm_logic(float acc_y) {
   }
 
 }
-
-void accel_to_angle(AccData accel_data, float * accel_pitch, float * accel_yaw) {
+// const indicates to the compiler that the variable is read only, and will throw an error if try to modify
+void accel_to_angle(const AccData accel_data, float * accel_pitch, float * accel_yaw) {
   *accel_pitch = (float)atan2(accel_data.acc_x, accel_data.acc_z); // shouldn't matter if in mg
   *accel_yaw = (float)atan2(accel_data.acc_y, accel_data.acc_z); // radians
   
@@ -157,16 +156,17 @@ int main(void)
   TIM1->CCR1 = 0;
   TIM1->CCR2 = 0;
 
-
-  AccData accel_data;
-  GyroData gyro_data;
+  // AccData accel_data;
+  // GyroData gyro_data;
 
   // SD_Card_Test();
   // SD_Card_Write();
   float accel_pitch, accel_yaw;
   float prev_pitch = 0, prev_yaw = 0;
   PID_params pid;
-  pid_init(&pid); // bro check ur dereferencing
+  pid_init(&pid); 
+
+  log_accel(1, -1, -1);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -182,13 +182,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    accel_burst_read(&accel_data);
-    gyro_burst_read(&gyro_data);
+    // accel_burst_read(&accel_data);
+    // gyro_burst_read(&gyro_data);
     
-    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
-    float pitch = comp_filter(0, 1, prev_pitch, gyro_data.rate_x, accel_pitch); // alpha = 1 means purely based on accel
-    uint16_t pitch_duty = pid_update(&pid, 0, pitch, 1); 
-    select_thruster(pid.error, pitch_duty, 0, 0, 1);
+    // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
+    // float pitch = comp_filter(0, 1, prev_pitch, gyro_data.rate_x, accel_pitch); // alpha = 1 means purely based on accel
+    // uint16_t pitch_duty = pid_update(&pid, 0, pitch, 1); 
+    // select_thruster(pid.error, pitch_duty, 0, 0, 1);
     
     // pwm_logic(accel_data.acc_y);
     

@@ -77,25 +77,6 @@ extern SPI_HandleTypeDef hspi1;
 #define TIMEOUT 100 //ms
 #define BYTE_SIZE 1
 
-// Data types
-typedef struct {
-  float rate_x;
-  float rate_y;
-  float rate_z;
-} GyroData;
-
-typedef struct {
-    float acc_x;
-    float acc_y;
-    float acc_z;
-} AccData;
-
-typedef struct {
-  float pitch;
-  float yaw;
-  int dt;
-} Attitude;
-
 // Functions
 uint8_t gyro_spi_read(uint8_t address);
 uint8_t accel_init();
