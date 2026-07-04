@@ -31,6 +31,7 @@
 #include "bmi088.h"
 #include "sd.h"
 #include "global.h"
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,7 +40,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-AccData my_accel_data;
+extern AccData accel_data;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -129,7 +130,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* creation of readIMU */
-  readIMUHandle = osThreadNew(StartReadIMU, &my_accel_data, &readIMU_attributes);
+  readIMUHandle = osThreadNew(StartReadIMU, NULL, &readIMU_attributes);
 
   /* creation of pidUpdate */
   pidUpdateHandle = osThreadNew(StartPidUpdate, NULL, &pidUpdate_attributes);
@@ -160,18 +161,15 @@ void MX_FREERTOS_Init(void) {
 void StartReadIMU(void *argument)
 { 
   /* USER CODE BEGIN StartReadIMU */
-  // acccel_data now holds the address of an AccData. 
-  // without the typecast, it would hold an address of a ??, so we wouldn't be able to -> 
-  AccData *my_accel_data = (AccData*)argument;
-  MessageQueue_t msg;
+    MessageQueue_t msg;
   /* Infinite loop */
   for(;;)
   {
-    accel_burst_read(my_accel_data);
-    msg.timestamp = xTaskGetTickCount()
-    msg.acc_x = my_accel_data->acc_x
-    msg.acc_y = my_accel_data->acc_y
-    msg.acc_z = my_accel_data->acc_z
+    accel_burst_read(&accel_data);
+    msg.timestamp = xTaskGetTickCount(); // uint32? 
+    msg.acc_x = accel_data.acc_x;
+    msg.acc_y = accel_data.acc_y;
+    msg.acc_z = accel_data.acc_z;
     osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
     osDelay(100); // 10Hz
   }
@@ -224,13 +222,20 @@ void StartSelectThruster(void *argument)
 void StartLog(void *argument)
 {
   /* USER CODE BEGIN StartLog */
-  messageQueue_t msg;
+  MessageQueue_t buffer[12];
+  SD_Card_init();
   /* Infinite loop */
   for(;;)
   {
-    // 0 timeout means will return immediately 
-    osMessageQueueGet(messageQueueHandle, &msg, 0, 0)
-    log_accel(0, msg, osThreadGetId());
+    // 0 timeout means will return immediately - I want this because I want to maintain the 1Hz
+    // There are 12 elements in buffer, so there should always be 10 in there anyways since I'm reading at 10Hz
+    // osMessageQueueGet(messageQueueHandle, NULL, 0, 0); // this only grabs 1 element, not all 10
+    uint8_t count = 0;
+    while (count < 10 && osMessageQueueGet(messageQueueHandle, &buffer[count], NULL, 0) == osOK) {
+        count++;
+    }
+
+    log_accel(count, buffer, osThreadGetId());
     osDelay(1000); // 1Hz, every second
   }
   /* USER CODE END StartLog */

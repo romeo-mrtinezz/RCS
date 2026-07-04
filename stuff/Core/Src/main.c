@@ -53,6 +53,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 // extern osMessageQueueId_t messageQueueHandle;
+AccData accel_data;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -163,7 +164,6 @@ int main(void)
   PID_params pid;
   pid_init(&pid); 
 
-  log_accel(1, -1, -1);
   /* USER CODE END 2 */
 
   /* Init scheduler */

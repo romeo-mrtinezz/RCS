@@ -39,6 +39,7 @@ burst access mechanism which auto-increments the register being read without hav
 // Includes
 #include "main.h"
 #include "spi.h"
+#include "global.h"
 #include "stm32g483xx.h"
 #include "stm32g4xx_hal_spi.h"
 extern SPI_HandleTypeDef hspi1;

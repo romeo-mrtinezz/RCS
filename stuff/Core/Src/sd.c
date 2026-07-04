@@ -10,8 +10,6 @@
 #include "global.h"
 
 void SD_Card_Write() {
-  FATFS FatFs;
-  FIL Fil;
   FRESULT FR_Status;
   FATFS *FS_Ptr;
   UINT RWC, WWC; // Read/Write Word Counter
@@ -60,8 +58,6 @@ void SD_Card_Write() {
 }
 
 void SD_Card_Test() { // static means can only be used in this file, you can have the same name function in other files
-  FATFS FatFs;
-  FIL Fil;
   FRESULT FR_Status;
   FATFS *FS_Ptr;
   UINT RWC, WWC; // Read/Write Word Counter
