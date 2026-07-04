@@ -52,7 +52,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-extern osMessageQueueId_t MessageQueueHandle;
+extern osMessageQueueId_t messageQueueHandle;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/

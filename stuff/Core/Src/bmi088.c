@@ -14,6 +14,7 @@
 #include "bmi088.h"
 #include "stm32g4xx_hal_spi.h"
 #include <stdint.h>
+#include "global.h"
 // extern SPI_HandleTypeDef hspi1;
 
 // Functions

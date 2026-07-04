@@ -30,6 +30,7 @@
 #include "pid.h"
 #include "bmi088.h"
 #include "sd.h"
+#include "global.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/

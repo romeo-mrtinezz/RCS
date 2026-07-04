@@ -58,8 +58,11 @@ void SD_Card_Write() {
   FR_Status = f_mount(NULL, "", 0);
   
 }
-
-void log_accel(bool header, MessageQueue_t msg, osThreadId_t thread_id) {
+/*
+Create csv file
+Mount sd card
+*/
+SD_card_init() {
   FATFS FatFs;
   FIL Fil;
   FRESULT FR_Status;
@@ -68,11 +71,10 @@ void log_accel(bool header, MessageQueue_t msg, osThreadId_t thread_id) {
   DWORD FreeClusters;
   uint32_t TotalSize, FreeSpace;
   char TxBuffer[250]; 
-  char RW_Buffer[200];
-
-do {
-    // Mount SD Card
-    FR_Status = f_mount(&FatFs, "", 1);
+  
+  do {
+    // Mount SD card
+    FR_Status = f_mount(&FatFs, "", 0);
     if (FR_Status != FR_OK)
     {
       sprintf(TxBuffer, "Error! While Mounting SD Card, Error Code: (%i)\r\n", FR_Status);
@@ -85,31 +87,45 @@ do {
     TotalSize = (uint32_t)((FS_Ptr->n_fatent - 2) * FS_Ptr->csize * 0.5);
     FreeSpace = (uint32_t)(FreeClusters * FS_Ptr->csize * 0.5);
 
-    // Create and open csv file
-    if (bool == 1) {
-    FR_Status = f_open(&Fil, "Accel_data.csv", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
+    // Open csv file, if doesn't exist, creates it
+    FR_Status = f_open(&Fil, "accel_data.csv", FA_WRITE | FA_READ | FA_OPEN_ALWAYS);
     if(FR_Status != FR_OK)
     {
       sprintf(TxBuffer, "Error! While Creating/Opening A New Text File, Error Code: (%i)\r\n", FR_Status);
       break;
     }
 
-      f_puts("time_ms,acc_x,acc_y,acc_z\n", &Fil); //\n move cursor to front, new line
-    }
+    // Write headers
+    f_puts("time_ms,acc_x,acc_y,acc_z\n", &Fil); //\n move cursor to front, new line
+    f_sync(&Fil);
+  } while(0);
+}
 
-    else {
-      FR_Status = f_open(&Fil, "Accel_data.csv", FA_OPEN_EXISTING | FA_WRITE);
-      FR_Status = f_lseek(&Fil, f_size(&Fil)); // Move The File Pointer To The EOF (End-Of-File)
-      if(FR_Status != FR_OK)
-      {
-        sprintf(TxBuffer, "Error! While Opening (TextFileWrite.txt) File For Update.. \r\n");
-        break;
-      }
-    
+
+void log_accel(MessageQueue_t msg, osThreadId_t thread_id) {
+  FATFS FatFs;
+  FIL Fil;
+  FRESULT FR_Status;
+  FATFS *FS_Ptr;
+  UINT RWC, WWC; // Read/Write Word Counter
+  DWORD FreeClusters;
+  uint32_t TotalSize, FreeSpace;
+  char TxBuffer[250]; 
+  char RW_Buffer[200];
+
+do {
+    FR_Status = f_open(&Fil, "Accel_data.csv", FA_OPEN_EXISTING | FA_WRITE);
+    FR_Status = f_lseek(&Fil, f_size(&Fil)); // Move The File Pointer To The EOF (End-Of-File)
+    if(FR_Status != FR_OK)
+    {
+      sprintf(TxBuffer, "Error! While Opening (TextFileWrite.txt) File For Update.. \r\n");
+      break;
+    }
+  
     sprintf(RW_Buffer, "%.1d, %.2f, %.2f, %.2f\n", msg.timestamp, msg.acc_x, msg.acc_y, msg.acc_z);
     f_write(&Fil, RW_Buffer, strlen(RW_Buffer), &WWC);
     f_close(&Fil);
-    }
+    
 
     if (xTaskGetTickCount() > pdMS_TO_TICKS(2000)) { // after 20s dismount sdcard and end task
       // Unmount SD card
