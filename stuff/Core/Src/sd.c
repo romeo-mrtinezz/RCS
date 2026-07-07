@@ -3,11 +3,15 @@
 #include "app_fatfs.h"
 #include "cmsis_os2.h"
 #include "ff.h"
+#include "main.h"
 #include "projdefs.h"
+#include <stdint.h>
 #include <sys/_intsup.h>
 #include <stdio.h>
 #include <string.h>
 #include "global.h"
+#include "stm32g4xx_hal.h"
+#include "stm32g4xx_hal_gpio.h"
 
 void SD_Card_Write() {
   FRESULT FR_Status;
@@ -230,7 +234,25 @@ do {
       // Unmount SD card
       f_close(&Fil);
       FR_Status = f_mount(NULL, "", 0);
+      HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
       osThreadTerminate(thread_id);
     }
   } while(0);
+}
+
+// no rtos
+void log_pls(uint32_t time, AccData * accel_data) {
+  FRESULT FR_Status;
+  FATFS *FS_Ptr;
+  UINT RWC, WWC; // Read/Write Word Counter
+  char TxBuffer[250]; 
+  char RW_Buffer[200]; 
+  sprintf(RW_Buffer, "%lu,%.2f,%.2f,%.2f\n", time, accel_data->acc_x, accel_data->acc_y, accel_data->acc_z);
+  f_write(&Fil, RW_Buffer, strlen(RW_Buffer), &WWC); 
+  if (time >= 20000) { //ms
+    f_close(&Fil);
+    FR_Status = f_mount(NULL, "", 0);
+    HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+  }
+
 }

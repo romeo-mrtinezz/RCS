@@ -20,7 +20,6 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "app_fatfs.h"
-#include "cmsis_os2.h"
 #include "spi.h"
 #include "tim.h"
 #include "usb.h"
@@ -32,6 +31,7 @@
 #include "ff.h"
 #include "pid.h"
 #include "global.h"
+#include "sd.h"
 
 #include "stm32g483xx.h"
 #include "stm32g4xx_hal.h"
@@ -133,9 +133,6 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  if (accel_init() != 30) {
-    HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
-  }
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -150,6 +147,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+  uint8_t pls = accel_init();
+  if (pls != 30) {
+    HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+  }
 
   TIM1->CCR1 = 0;
   TIM1->CCR2 = 0;
@@ -167,21 +168,28 @@ int main(void)
   /* USER CODE END 2 */
 
   /* Init scheduler */
-  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
-  MX_FREERTOS_Init();
+  // osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  // MX_FREERTOS_Init();
 
   /* Start scheduler */
-  osKernelStart();
+  // osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
-
+  // static FATFS FatFs;
+  // static FIL Fil; 
+  SD_Card_init();
+  int time;
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    // accel_burst_read(&accel_data);
-    // gyro_burst_read(&gyro_data);
-    
+    accel_burst_read(&accel_data);
+    log_pls(HAL_GetTick(), &accel_data);
+    if (HAL_GetTick() > 20000) {
+      while (1) {
+
+      };
+    };
     // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
     // float pitch = comp_filter(0, 1, prev_pitch, gyro_data.rate_x, accel_pitch); // alpha = 1 means purely based on accel
     // uint16_t pitch_duty = pid_update(&pid, 0, pitch, 1); 

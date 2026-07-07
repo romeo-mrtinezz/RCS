@@ -20,7 +20,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
 #include "cmsis_os2.h"
-#include "stm32g4xx_hal.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -56,20 +55,6 @@ extern AccData accel_data;
 osThreadId_t readIMUHandle;
 const osThreadAttr_t readIMU_attributes = {
   .name = "readIMU",
-  .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 128 * 4
-};
-/* Definitions for pidUpdate */
-osThreadId_t pidUpdateHandle;
-const osThreadAttr_t pidUpdate_attributes = {
-  .name = "pidUpdate",
-  .priority = (osPriority_t) osPriorityLow,
-  .stack_size = 128 * 4
-};
-/* Definitions for selectThruster */
-osThreadId_t selectThrusterHandle;
-const osThreadAttr_t selectThruster_attributes = {
-  .name = "selectThruster",
   .priority = (osPriority_t) osPriorityLow,
   .stack_size = 128 * 4
 };
@@ -77,8 +62,8 @@ const osThreadAttr_t selectThruster_attributes = {
 osThreadId_t logHandle;
 const osThreadAttr_t log_attributes = {
   .name = "log",
-  .priority = (osPriority_t) osPriorityLow,
-  .stack_size = 128 * 4
+  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 551 * 4
 };
 /* Definitions for messageQueue */
 osMessageQueueId_t messageQueueHandle;
@@ -92,11 +77,24 @@ const osMessageQueueAttr_t messageQueue_attributes = {
 /* USER CODE END FunctionPrototypes */
 
 void StartReadIMU(void *argument);
-void StartPidUpdate(void *argument);
-void StartSelectThruster(void *argument);
 void StartLog(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
+
+/* Hook prototypes */
+void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
+
+/* USER CODE BEGIN 4 */
+void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
+{
+   /* Run time stack overflow checking is performed if
+   configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
+   called if a stack overflow is detected. */
+   while(1) {
+    // stay here don't corrupt memory
+   }
+}
+/* USER CODE END 4 */
 
 /**
   * @brief  FreeRTOS initialization
@@ -132,14 +130,11 @@ void MX_FREERTOS_Init(void) {
   /* creation of readIMU */
   readIMUHandle = osThreadNew(StartReadIMU, NULL, &readIMU_attributes);
 
-  /* creation of pidUpdate */
-  pidUpdateHandle = osThreadNew(StartPidUpdate, NULL, &pidUpdate_attributes);
-
-  /* creation of selectThruster */
-  selectThrusterHandle = osThreadNew(StartSelectThruster, NULL, &selectThruster_attributes);
-
   /* creation of log */
   logHandle = osThreadNew(StartLog, NULL, &log_attributes);
+  if (logHandle == NULL) {
+  HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin); // flag creation failure
+}
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -159,7 +154,7 @@ void MX_FREERTOS_Init(void) {
   */
 /* USER CODE END Header_StartReadIMU */
 void StartReadIMU(void *argument)
-{ 
+{
   /* USER CODE BEGIN StartReadIMU */
     MessageQueue_t msg;
   /* Infinite loop */
@@ -171,45 +166,13 @@ void StartReadIMU(void *argument)
     msg.acc_y = accel_data.acc_y;
     msg.acc_z = accel_data.acc_z;
     osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
+    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
+    // osDelay(1);
+    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
+    // osDelay(1);    
     osDelay(100); // 10Hz
   }
   /* USER CODE END StartReadIMU */
-}
-
-/* USER CODE BEGIN Header_StartPidUpdate */
-/**
-* @brief Function implementing the pidUpdate thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartPidUpdate */
-void StartPidUpdate(void *argument)
-{
-  /* USER CODE BEGIN StartPidUpdate */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartPidUpdate */
-}
-
-/* USER CODE BEGIN Header_StartSelectThruster */
-/**
-* @brief Function implementing the selectThruster thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartSelectThruster */
-void StartSelectThruster(void *argument)
-{
-  /* USER CODE BEGIN StartSelectThruster */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartSelectThruster */
 }
 
 /* USER CODE BEGIN Header_StartLog */
@@ -233,6 +196,11 @@ void StartLog(void *argument)
     uint8_t count = 0;
     while (count < 10 && osMessageQueueGet(messageQueueHandle, &buffer[count], NULL, 0) == osOK) {
         count++;
+        // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
+        // osDelay(1);
+        // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
+        // osDelay(1);
+
     }
 
     log_accel(count, buffer, osThreadGetId());
