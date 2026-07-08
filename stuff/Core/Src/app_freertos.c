@@ -19,7 +19,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
-#include "cmsis_os2.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -30,6 +29,7 @@
 #include "bmi088.h"
 #include "sd.h"
 #include "global.h"
+#include <stdint.h>
 #include <string.h>
 /* USER CODE END Includes */
 
@@ -132,9 +132,6 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of log */
   logHandle = osThreadNew(StartLog, NULL, &log_attributes);
-  if (logHandle == NULL) {
-  HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin); // flag creation failure
-}
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -157,6 +154,7 @@ void StartReadIMU(void *argument)
 {
   /* USER CODE BEGIN StartReadIMU */
     MessageQueue_t msg;
+    uint32_t hlw;
   /* Infinite loop */
   for(;;)
   {
@@ -171,6 +169,7 @@ void StartReadIMU(void *argument)
     // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
     // osDelay(1);    
     osDelay(100); // 10Hz
+    hlw = uxTaskGetStackHighWaterMark(logHandle);
   }
   /* USER CODE END StartReadIMU */
 }
@@ -194,16 +193,18 @@ void StartLog(void *argument)
     // There are 12 elements in buffer, so there should always be 10 in there anyways since I'm reading at 10Hz
     // osMessageQueueGet(messageQueueHandle, NULL, 0, 0); // this only grabs 1 element, not all 10
     uint8_t count = 0;
-    while (count < 10 && osMessageQueueGet(messageQueueHandle, &buffer[count], NULL, 0) == osOK) {
+    while (count < 10 && osMessageQueueGet(messageQueueHandle, &buffer[count], NULL, osWaitForever) == osOK) {
         count++;
-        // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
-        // osDelay(1);
-        // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
-        // osDelay(1);
+        HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
+        osDelay(1);
+        HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
+        osDelay(1);
 
     }
 
+    // osStatus_t status = osMessageQueueGet(messageQueueHandle, &buffer, NULL, osWaitForever);
     log_accel(count, buffer, osThreadGetId());
+    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
     osDelay(1000); // 1Hz, every second
   }
   /* USER CODE END StartLog */
