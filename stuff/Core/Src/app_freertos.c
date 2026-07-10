@@ -154,12 +154,14 @@ void StartReadIMU(void *argument)
 {
   /* USER CODE BEGIN StartReadIMU */
     MessageQueue_t msg;
+    float accel_pitch, accel_yaw;
     uint32_t hlw;
   /* Infinite loop */
   for(;;)
   {
     accel_burst_read(&accel_data);
     msg.timestamp = xTaskGetTickCount(); // uint32? 
+    accel_to_angle(accel_data, &accel_pitch, &accel_yaw)
     msg.acc_x = accel_data.acc_x;
     msg.acc_y = accel_data.acc_y;
     msg.acc_z = accel_data.acc_z;

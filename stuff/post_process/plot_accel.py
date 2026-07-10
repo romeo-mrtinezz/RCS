@@ -95,6 +95,18 @@ def plot_3d_trajectory(df: pd.DataFrame):
     fig.tight_layout()
     return fig
 
+def simple_moving_average_filter(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Applies a 3-point simple moving average (current + previous 2 samples)
+    to acc_x, acc_y, acc_z. Returns a new DataFrame with smoothed values.
+    The first 2 rows use whatever samples are available (min_periods=1),
+    so no rows are dropped.
+    """
+    smoothed = df.copy()
+    for axis in ("acc_x", "acc_y", "acc_z"):
+        smoothed[axis] = df[axis].rolling(window=3, min_periods=1).mean()
+    return smoothed
+
 
 def main():
     if len(sys.argv) != 2:
@@ -104,11 +116,11 @@ def main():
     filepath = sys.argv[1]
     df = load_data(filepath)
 
-    fig_x = plot_axis_vs_time(df, "acc_x", "tab:red")
-    fig_y = plot_axis_vs_time(df, "acc_y", "tab:green")
-    fig_z = plot_axis_vs_time(df, "acc_z", "tab:blue")
-    fig_all = plot_all_axes_vs_time(df)
-    fig_3d = plot_3d_trajectory(df)
+    fig_x = plot_axis_vs_time(simple_moving_average_filter(df), "acc_x", "tab:red")
+    fig_y = plot_axis_vs_time(simple_moving_average_filter(df), "acc_y", "tab:green")
+    fig_z = plot_axis_vs_time(simple_moving_average_filter(df), "acc_z", "tab:blue")
+    fig_all = plot_all_axes_vs_time(simple_moving_average_filter(df))
+    fig_3d = plot_3d_trajectory(simple_moving_average_filter(df))
 
     # Make sure the output folder exists, then save all figures into it
     os.makedirs(OUTPUT_DIR, exist_ok=True)

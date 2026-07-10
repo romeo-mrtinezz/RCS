@@ -53,7 +53,7 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void accel_to_angle(const AccData accel_data, float * accel_pitch, float * accel_yaw);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
