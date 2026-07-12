@@ -59,7 +59,6 @@ AccData accel_data;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define USBBUF_MAXLEN 128
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -156,7 +155,7 @@ int main(void)
   TIM1->CCR1 = 0;
   TIM1->CCR2 = 0;
 
-  // AccData accel_data;
+  AccData accel_data;
   // GyroData gyro_data;
 
   // SD_Card_Test();
@@ -176,14 +175,16 @@ int main(void)
   // osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
-
+  char usb_buf[100];
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    // result = CDC_Transmit_FS(((uint8_t*)"Hello World\n"), 12);
-    // len = snprintf(((char *)usbTxBuf), USBBUF_MAXLEN, "%lu\r\n", HAL_GetTick());
-    // result = CDC_Transmit_FS(usbTxBuf, len);
+    accel_burst_read(&accel_data); 
+    sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", HAL_GetTick(), accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
+    CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
+    HAL_Delay(250);
+  
     // HAL_Delay(1000);
     // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
     // float pitch = comp_filter(0, 1, prev_pitch, gyro_data.rate_x, accel_pitch); // alpha = 1 means purely based on accel
