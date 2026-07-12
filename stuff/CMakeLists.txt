@@ -73,3 +73,8 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 )
 
 target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -u _printf_float)
+
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
+    -Wno-unused-variable
+    -Wno-unused-but-set-variable
+)

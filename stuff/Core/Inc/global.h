@@ -1,5 +1,5 @@
-#ifndef GLOBAL_H
-#define GLOBAL_H
+#ifndef __GLOBAL_H
+#define __GLOBAL_H
 
 #include "ff.h"
 static FATFS FatFs;
@@ -39,4 +39,4 @@ typedef struct {
     float acc_z;
 } MessageQueue_t;
 
-#endif // GLOBAL_H
+#endif // __GLOBAL_H

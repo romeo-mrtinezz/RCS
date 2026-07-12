@@ -23,6 +23,8 @@
 #include "main.h"
 #include "cmsis_os.h"
 
+#include "usb_device.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "pid.h"
@@ -152,6 +154,8 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_StartReadIMU */
 void StartReadIMU(void *argument)
 {
+  /* init code for USB_Device */
+  MX_USB_Device_Init();
   /* USER CODE BEGIN StartReadIMU */
     MessageQueue_t msg;
     float accel_pitch, accel_yaw;
@@ -161,7 +165,7 @@ void StartReadIMU(void *argument)
   {
     accel_burst_read(&accel_data);
     msg.timestamp = xTaskGetTickCount(); // uint32? 
-    accel_to_angle(accel_data, &accel_pitch, &accel_yaw)
+    // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
     msg.acc_x = accel_data.acc_x;
     msg.acc_y = accel_data.acc_y;
     msg.acc_z = accel_data.acc_z;

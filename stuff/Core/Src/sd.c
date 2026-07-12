@@ -1,5 +1,6 @@
 
 // Includes
+#include "global.h"
 #include "app_fatfs.h"
 #include "cmsis_os2.h"
 #include "ff.h"
@@ -9,7 +10,6 @@
 #include <sys/_intsup.h>
 #include <stdio.h>
 #include <string.h>
-#include "global.h"
 #include "stm32g4xx_hal.h"
 #include "stm32g4xx_hal_gpio.h"
 

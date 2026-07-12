@@ -22,7 +22,7 @@
 #include "app_fatfs.h"
 #include "spi.h"
 #include "tim.h"
-#include "usb.h"
+#include "usb_device.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -32,6 +32,7 @@
 #include "pid.h"
 #include "global.h"
 #include "sd.h"
+#include "usbd_cdc_if.h"
 
 #include "stm32g483xx.h"
 #include "stm32g4xx_hal.h"
@@ -58,7 +59,7 @@ AccData accel_data;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define USBBUF_MAXLEN 128
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -140,11 +141,11 @@ int main(void)
   MX_SPI1_Init();
   MX_SPI2_Init();
   MX_TIM1_Init();
-  MX_USB_PCD_Init();
   if (MX_FATFS_Init() != APP_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN 2 */
+  MX_USB_Device_Init(); // <-------------------------------------------------
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
   uint8_t pls = accel_init();
@@ -168,11 +169,11 @@ int main(void)
   /* USER CODE END 2 */
 
   /* Init scheduler */
-  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
-  MX_FREERTOS_Init();
+  // osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  // MX_FREERTOS_Init();
 
   /* Start scheduler */
-  osKernelStart();
+  // osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
@@ -180,13 +181,10 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    accel_burst_read(&accel_data);
-    log_pls(HAL_GetTick(), &accel_data);
-    if (HAL_GetTick() > 20000) {
-      while (1) {
-
-      };
-    };
+    // result = CDC_Transmit_FS(((uint8_t*)"Hello World\n"), 12);
+    // len = snprintf(((char *)usbTxBuf), USBBUF_MAXLEN, "%lu\r\n", HAL_GetTick());
+    // result = CDC_Transmit_FS(usbTxBuf, len);
+    // HAL_Delay(1000);
     // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
     // float pitch = comp_filter(0, 1, prev_pitch, gyro_data.rate_x, accel_pitch); // alpha = 1 means purely based on accel
     // uint16_t pitch_duty = pid_update(&pid, 0, pitch, 1); 
@@ -209,6 +207,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Configure the main internal regulator output voltage
   */
@@ -217,12 +216,13 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV3;
   RCC_OscInitStruct.PLL.PLLN = 12;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV4;
@@ -242,6 +242,14 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+    /* Select PLLQ as the USB clock source */
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
+  PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
