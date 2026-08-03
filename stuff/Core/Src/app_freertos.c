@@ -19,6 +19,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
+#include "stm32g4xx_hal.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -41,6 +42,10 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 extern USBD_HandleTypeDef hUsbDeviceFS;
+
+extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
+extern uint8_t received_flag;
+extern uint32_t received_length;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -171,35 +176,44 @@ void StartReadIMU(void *argument)
 {
   /* init code for USB_Device */
   MX_USB_Device_Init();
-  /* USER CODE BEGIN StartReadIMU */
-    MessageQueue_t msg;
-    // float accel_pitch, accel_yaw;
-    // uint32_t hlw;
-    char usb_buf[100];
-    // osStatus_t os_status;
-    uint8_t usb_status;
-
-  /* Infinite loop */
-  for(;;)
-  {
-    // This task is the highest priority though, so I assume no other task would prempt it?
-    accel_burst_read(&accel_data);
-    msg.timestamp = xTaskGetTickCount(); // uint32? 
-    // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
-    msg.acc_x = accel_data.acc_x;
-    msg.acc_y = accel_data.acc_y;
-    msg.acc_z = accel_data.acc_z;
-    
-    // sprintf(usb_buf, "Hey world\n");
-    sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", msg.timestamp, accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
-    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
-      usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
+  for(;;) {
+    if (received_flag == 1) {
+      received_flag = 0;
+      if(strncmp((char*)UserRxBufferFS, "ping", received_length) == 0) {
+        HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+        printf("pong\n");
+      }
     }
-    osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
-    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
-    // osDelay(1);
-    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
-    // osDelay(1);    
+    // printf("hey\n");
+  // /* USER CODE BEGIN StartReadIMU */
+  //   MessageQueue_t msg;
+  //   // float accel_pitch, accel_yaw;
+  //   // uint32_t hlw;
+  //   char usb_buf[100];
+  //   // osStatus_t os_status;
+  //   uint8_t usb_status;
+
+  // /* Infinite loop */
+  // for(;;)
+  // {
+  //   // This task is the highest priority though, so I assume no other task would prempt it?
+  //   accel_burst_read(&accel_data);
+  //   msg.timestamp = xTaskGetTickCount(); // uint32? 
+  //   // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
+  //   msg.acc_x = accel_data.acc_x;
+  //   msg.acc_y = accel_data.acc_y;
+  //   msg.acc_z = accel_data.acc_z;
+
+  //   // sprintf(usb_buf, "Hey world\n");
+  //   sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", msg.timestamp, accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
+  //   if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
+  //     usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
+  //   }
+  //   osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
+  //   // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
+  //   // osDelay(1);
+  //   // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
+  //   // osDelay(1);    
     osDelay(100); // 10Hz
     // hlw = uxTaskGetStackHighWaterMark(logHandle);
   }
@@ -217,7 +231,7 @@ void StartLog(void *argument)
 {
   /* USER CODE BEGIN StartLog */
   MessageQueue_t buffer[12];
-  SD_Card_init();
+  // SD_Card_init();
 
   /* Infinite loop */
   for(;;)
@@ -234,8 +248,9 @@ void StartLog(void *argument)
         osDelay(1);
 
     }
-    
-    log_accel(count, buffer, osThreadGetId());
+    // semaphore here?
+    // log_accel(count, buffer, osThreadGetId());
+    // post semaphore, this is so 
     osDelay(1000); // 1Hz, every second
   }
   /* USER CODE END StartLog */

@@ -105,6 +105,14 @@ void accel_to_angle(const AccData accel_data, float * accel_pitch, float * accel
   *accel_pitch = *accel_pitch * 180.0f/M_PI; // degrees
   *accel_yaw = *accel_yaw * 180.0f/M_PI; 
 };
+
+int _write(int file, char *ptr, int len) {
+  while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
+    HAL_Delay(1);
+  }
+
+  return(len);
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
