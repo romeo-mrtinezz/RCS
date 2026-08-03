@@ -33,10 +33,14 @@
 #include "global.h"
 #include <stdint.h>
 #include <string.h>
+#include "usbd_cdc.h"
+#include "usbd_cdc_if.h"
+#include "usbd_def.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+extern USBD_HandleTypeDef hUsbDeviceFS;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -57,20 +61,25 @@ extern AccData accel_data;
 osThreadId_t readIMUHandle;
 const osThreadAttr_t readIMU_attributes = {
   .name = "readIMU",
-  .priority = (osPriority_t) osPriorityLow,
-  .stack_size = 128 * 4
+  .priority = (osPriority_t) osPriorityHigh,
+  .stack_size = 2500 * 4
 };
 /* Definitions for log */
 osThreadId_t logHandle;
 const osThreadAttr_t log_attributes = {
   .name = "log",
   .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 551 * 4
+  .stack_size = 2000 * 4
 };
 /* Definitions for messageQueue */
 osMessageQueueId_t messageQueueHandle;
 const osMessageQueueAttr_t messageQueue_attributes = {
   .name = "messageQueue"
+};
+/* Definitions for testSemaphore */
+osSemaphoreId_t testSemaphoreHandle;
+const osSemaphoreAttr_t testSemaphore_attributes = {
+  .name = "testSemaphore"
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -112,6 +121,10 @@ void MX_FREERTOS_Init(void) {
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
+  /* Create the semaphores(s) */
+  /* creation of testSemaphore */
+  testSemaphoreHandle = osSemaphoreNew(1, 1, &testSemaphore_attributes);
+
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
@@ -122,9 +135,11 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of messageQueue */
-  messageQueueHandle = osMessageQueueNew (12, sizeof(MessageQueue_t), &messageQueue_attributes);
+  // messageQueueHandle = osMessageQueueNew (12, sizeof(uint16_t), &messageQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
+  messageQueueHandle = osMessageQueueNew (12, sizeof(MessageQueue_t), &messageQueue_attributes);
+
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
@@ -158,24 +173,35 @@ void StartReadIMU(void *argument)
   MX_USB_Device_Init();
   /* USER CODE BEGIN StartReadIMU */
     MessageQueue_t msg;
-    float accel_pitch, accel_yaw;
-    uint32_t hlw;
+    // float accel_pitch, accel_yaw;
+    // uint32_t hlw;
+    char usb_buf[100];
+    // osStatus_t os_status;
+    uint8_t usb_status;
+
   /* Infinite loop */
   for(;;)
   {
+    // This task is the highest priority though, so I assume no other task would prempt it?
     accel_burst_read(&accel_data);
     msg.timestamp = xTaskGetTickCount(); // uint32? 
     // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
     msg.acc_x = accel_data.acc_x;
     msg.acc_y = accel_data.acc_y;
     msg.acc_z = accel_data.acc_z;
+    
+    // sprintf(usb_buf, "Hey world\n");
+    sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", msg.timestamp, accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
+    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
+      usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
+    }
     osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
     // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
     // osDelay(1);
     // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
     // osDelay(1);    
     osDelay(100); // 10Hz
-    hlw = uxTaskGetStackHighWaterMark(logHandle);
+    // hlw = uxTaskGetStackHighWaterMark(logHandle);
   }
   /* USER CODE END StartReadIMU */
 }
@@ -192,13 +218,14 @@ void StartLog(void *argument)
   /* USER CODE BEGIN StartLog */
   MessageQueue_t buffer[12];
   SD_Card_init();
+
   /* Infinite loop */
   for(;;)
   {
     // 0 timeout means will return immediately - I want this because I want to maintain the 1Hz
     // There are 12 elements in buffer, so there should always be 10 in there anyways since I'm reading at 10Hz
-    // osMessageQueueGet(messageQueueHandle, NULL, 0, 0); // this only grabs 1 element, not all 10
     uint8_t count = 0;
+    // This ensures that the program doesnt interrup the usb tranmsit and get stuck waiting for queue to filled up
     while (count < 10 && osMessageQueueGet(messageQueueHandle, &buffer[count], NULL, osWaitForever) == osOK) {
         count++;
         HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
@@ -207,10 +234,8 @@ void StartLog(void *argument)
         osDelay(1);
 
     }
-
-    // osStatus_t status = osMessageQueueGet(messageQueueHandle, &buffer, NULL, osWaitForever);
+    
     log_accel(count, buffer, osThreadGetId());
-    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
     osDelay(1000); // 1Hz, every second
   }
   /* USER CODE END StartLog */

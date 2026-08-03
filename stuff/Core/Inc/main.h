@@ -55,6 +55,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define NRST_Pin GPIO_PIN_10
+#define NRST_GPIO_Port GPIOG
 #define PWM1_Pin GPIO_PIN_0
 #define PWM1_GPIO_Port GPIOC
 #define PWM2_Pin GPIO_PIN_1
@@ -67,6 +69,8 @@ void Error_Handler(void);
 #define RED_LED_GPIO_Port GPIOA
 #define BLUE_LED_Pin GPIO_PIN_1
 #define BLUE_LED_GPIO_Port GPIOA
+#define PT1_IN_Pin GPIO_PIN_4
+#define PT1_IN_GPIO_Port GPIOA
 #define CS_GYRO_Pin GPIO_PIN_4
 #define CS_GYRO_GPIO_Port GPIOC
 #define CS_ACCEL_Pin GPIO_PIN_5
@@ -75,8 +79,28 @@ void Error_Handler(void);
 #define GYRO_INTR_GPIO_Port GPIOB
 #define ACCEL_INTR_Pin GPIO_PIN_1
 #define ACCEL_INTR_GPIO_Port GPIOB
+#define PT2_IN_Pin GPIO_PIN_2
+#define PT2_IN_GPIO_Port GPIOB
 #define CS_SD_Pin GPIO_PIN_6
 #define CS_SD_GPIO_Port GPIOC
+#define EXTRA_TX_Pin GPIO_PIN_9
+#define EXTRA_TX_GPIO_Port GPIOA
+#define EXTRA_RX_Pin GPIO_PIN_10
+#define EXTRA_RX_GPIO_Port GPIOA
+#define RFD_RTS_Pin GPIO_PIN_15
+#define RFD_RTS_GPIO_Port GPIOA
+#define RFD_TX_Pin GPIO_PIN_10
+#define RFD_TX_GPIO_Port GPIOC
+#define RFD_RX_Pin GPIO_PIN_11
+#define RFD_RX_GPIO_Port GPIOC
+#define RS422_TX_Pin GPIO_PIN_12
+#define RS422_TX_GPIO_Port GPIOC
+#define RS422_RX_Pin GPIO_PIN_2
+#define RS422_RX_GPIO_Port GPIOD
+#define CS_TC_Pin GPIO_PIN_5
+#define CS_TC_GPIO_Port GPIOB
+#define RFD_CTS_Pin GPIO_PIN_7
+#define RFD_CTS_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

@@ -19,9 +19,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "adc.h"
 #include "app_fatfs.h"
 #include "spi.h"
 #include "tim.h"
+#include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
 
@@ -143,8 +145,14 @@ int main(void)
   if (MX_FATFS_Init() != APP_OK) {
     Error_Handler();
   }
+  MX_ADC2_Init();
+  MX_SPI3_Init();
+  MX_UART4_Init();
+  MX_UART5_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  MX_USB_Device_Init(); // <-------------------------------------------------
+  // MX_USB_Device_Init(); // <-------------------------------------------------
+  // HAL_Delay(1000);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
   uint8_t pls = accel_init();
@@ -155,7 +163,7 @@ int main(void)
   TIM1->CCR1 = 0;
   TIM1->CCR2 = 0;
 
-  AccData accel_data;
+  // AccData accel_data;
   // GyroData gyro_data;
 
   // SD_Card_Test();
@@ -168,22 +176,22 @@ int main(void)
   /* USER CODE END 2 */
 
   /* Init scheduler */
-  // osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
-  // MX_FREERTOS_Init();
+  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
 
   /* Start scheduler */
-  // osKernelStart();
+  osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
-  char usb_buf[100];
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    accel_burst_read(&accel_data); 
-    sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", HAL_GetTick(), accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
-    CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
-    HAL_Delay(250);
+    // accel_burst_read(&accel_data); 
+    // sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", HAL_GetTick(), accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
+    // CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
+    // HAL_Delay(250);
   
     // HAL_Delay(1000);
     // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
@@ -208,7 +216,6 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Configure the main internal regulator output voltage
   */
@@ -243,14 +250,6 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-    /* Select PLLQ as the USB clock source */
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
-  PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }

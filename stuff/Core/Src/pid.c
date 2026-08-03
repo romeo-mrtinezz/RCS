@@ -37,7 +37,7 @@ float comp_filter(float alpha, int dt, float prev_angle, float gyro_rate, float 
 void pid_init(PID_params *pid) {
     pid->Kp = 800, pid->Ki = 0, pid->Kd = 0;
     pid -> integral = 0;
-    pid -> prev_error = 0;
+    pid -> prev_error = 0; 
     pid->min_duty = 3800, pid->max_duty = 6200; // Duty cycle max
 }
 
