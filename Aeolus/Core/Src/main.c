@@ -43,6 +43,7 @@
 /* USER CODE BEGIN PD */
 // extern osMessageQueueId_t messageQueueHandle;
 AccData accel_data;
+GyroData gyro_data;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/

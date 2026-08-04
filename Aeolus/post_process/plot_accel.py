@@ -1,6 +1,9 @@
 """
 plot_accel.py
 
+DISCLAIMER, THIS IS AI GENERATED
+use for sd card data
+
 Reads a CSV file containing accelerometer data (time_ms, acc_x, acc_y, acc_z)
 and produces:
   - 3 separate 2D line graphs: acc_x vs time, acc_y vs time, acc_z vs time

@@ -52,6 +52,7 @@ extern uint32_t received_length;
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 extern AccData accel_data;
+extern GyroData gyro_data;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -198,18 +199,22 @@ void StartReadIMU(void *argument)
     }
         
     // This task is the highest priority task
-    accel_burst_read(&accel_data);
+    // accel_burst_read(&accel_data);
+    gyro_burst_read(&gyro_data);
     msg.timestamp = xTaskGetTickCount(); // uint32? 
-    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
-    printf("accel_pitch: %.2f| accel_yaw: %.2f\n", accel_pitch, accel_yaw);
+    sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, gyro_data.rate_x, gyro_data.rate_y, gyro_data.rate_z);
+
+    // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
+    // printf("accel_pitch: %.2f| accel_yaw: %.2f\n", accel_pitch, accel_yaw);
     msg.acc_x = accel_data.acc_x;
     msg.acc_y = accel_data.acc_y;
     msg.acc_z = accel_data.acc_z;
 
+    // sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, msg.acc_x, msg.acc_y, msg.acc_z);
     // sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", msg.timestamp, accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
-    // if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
-    //   usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
-    // }
+    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
+      usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
+    }
     osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
 
     osDelay(100); // 10Hz
@@ -231,6 +236,7 @@ void StartLog(void *argument)
   /* USER CODE BEGIN StartLog */
   MessageQueue_t buffer[12];
   SD_Card_init();
+  uint32_t hlw;
 
   /* Infinite loop */
   for(;;)
@@ -250,6 +256,8 @@ void StartLog(void *argument)
     // semaphore here?
     log_accel(count, buffer, osThreadGetId());
     // post semaphore, this is so 
+    hlw = uxTaskGetStackHighWaterMark(readIMUHandle);
+    printf("hlw: %" PRIu32 "\r\n", hlw);
     osDelay(1000); // 1Hz, every second
   }
   /* USER CODE END StartLog */
