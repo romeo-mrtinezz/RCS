@@ -1,8 +1,1 @@
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/stm32g4xx_hal_msp.c:64:6:HAL_MspInit	16	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/stm32g4xx_hal_msp.c:91:6:HAL_SPI_MspInit	56	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/stm32g4xx_hal_msp.c:153:6:HAL_SPI_MspDeInit	16	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/stm32g4xx_hal_msp.c:202:6:HAL_TIM_Base_MspInit	24	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/stm32g4xx_hal_msp.c:219:6:HAL_TIM_MspPostInit	40	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/stm32g4xx_hal_msp.c:254:6:HAL_TIM_Base_MspDeInit	16	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/stm32g4xx_hal_msp.c:276:6:HAL_PCD_MspInit	104	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/stm32g4xx_hal_msp.c:310:6:HAL_PCD_MspDeInit	16	static
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/stm32g4xx_hal_msp.c:62:6:HAL_MspInit	16	static
