@@ -256,8 +256,8 @@ void StartLog(void *argument)
     // semaphore here?
     log_accel(count, buffer, osThreadGetId());
     // post semaphore, this is so 
-    hlw = uxTaskGetStackHighWaterMark(readIMUHandle);
-    printf("hlw: %" PRIu32 "\r\n", hlw);
+    // hlw = uxTaskGetStackHighWaterMark(readIMUHandle);
+    // printf("hlw: %" PRIu32 "\r\n", hlw);
     osDelay(1000); // 1Hz, every second
   }
   /* USER CODE END StartLog */

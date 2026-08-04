@@ -103,7 +103,7 @@ void accel_burst_read(AccData * accel_data) {
 };
 
 void gyro_burst_read(GyroData * gyro_data) {
-  uint8_t byte_1 = ACC_X_LSB | 0x80; // R mode
+  uint8_t byte_1 = RATE_X_LSB | 0x80; // R mode
   uint8_t gyro_buffer[6]; // 6 bytes of data
 
   HAL_GPIO_WritePin(GPIOC, CS_GYRO_Pin, GPIO_PIN_RESET);
