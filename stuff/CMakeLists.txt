@@ -45,11 +45,16 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    ${CMAKE_CURRENT_SOURCE_DIR}/MIDWARE/FATFS_SD/FATFS_SD.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/pid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/bmi088.c
+    Core/Src/sd.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    ${CMAKE_CURRENT_SOURCE_DIR}/MIDWARE/FATFS_SD
 )
 
 # Add project symbols (macros)
@@ -65,4 +70,11 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
+)
+
+target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -u _printf_float)
+
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
+    -Wno-unused-variable
+    -Wno-unused-but-set-variable
 )
