@@ -1,5 +1,0 @@
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/bmi088.c:21:9:gyro_spi_read	24	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/bmi088.c:38:9:accel_init	16	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/bmi088.c:67:9:accel_spi_read	24	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/bmi088.c:86:6:accel_burst_read	24	static
-C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/bmi088.c:105:6:gyro_burst_read	24	static

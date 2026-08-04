@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"C:/Users/romeo/OneDrive/Desktop/RCS/stuff/build/Debug/cmake_install.cmake",
-		"C:/Users/romeo/OneDrive/Desktop/RCS/stuff/build/Debug/cmake/stm32cubemx/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
