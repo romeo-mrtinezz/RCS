@@ -97,6 +97,7 @@ void pwm_logic(float acc_y) {
   }
 
 }
+
 // const indicates to the compiler that the variable is read only, and will throw an error if try to modify
 void accel_to_angle(const AccData accel_data, float * accel_pitch, float * accel_yaw) {
   *accel_pitch = (float)atan2(accel_data.acc_x, accel_data.acc_z); // shouldn't matter if in mg

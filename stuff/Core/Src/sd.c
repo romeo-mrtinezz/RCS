@@ -216,7 +216,7 @@ void log_accel(uint8_t count, MessageQueue_t * buffer, osThreadId_t thread_id) {
   FRESULT FR_Status;
   FATFS *FS_Ptr;
   UINT RWC, WWC; // Read/Write Word Counter
-  char TxBuffer[250]; 
+  // char TxBuffer[250]; 
   char RW_Buffer[200];
 
 do {
