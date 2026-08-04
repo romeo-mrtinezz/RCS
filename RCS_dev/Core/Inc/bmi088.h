@@ -46,15 +46,23 @@ burst access mechanism which auto-increments the register being read without hav
 #define ADDR_RATE_Z_LSB      0x06
 #define ADDR_RATE_Z_MSB      0x07
 #define GYRO_INT_STAT_1      0x0A
+#define FIFO_DATA            0x3F
+#define FIFO_STATUS          0x0E
 
 // Read/write
+#define FIFO_CONFIG_1 0x3E
 #define GYRO_INT_CTRL 0x15
 
 // Constants----------------------------
 #define TIMEOUT 100 //ms
 #define BYTE_SIZE 1
 
-// Function declarations
+// Data types
+typedef struct {
+  float rate_x;
+  float rate_y;
+  float rate_z;
+} GyroData;
 
 
 #endif /* __BMI088_H */

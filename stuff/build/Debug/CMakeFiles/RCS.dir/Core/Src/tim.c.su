@@ -1,0 +1,4 @@
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/tim.c:30:6:MX_TIM1_Init	120	static
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/tim.c:119:6:HAL_TIM_Base_MspInit	24	static
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/tim.c:134:6:HAL_TIM_MspPostInit	40	static
+C:/Users/romeo/OneDrive/Desktop/RCS/stuff/Core/Src/tim.c:165:6:HAL_TIM_Base_MspDeInit	16	static
