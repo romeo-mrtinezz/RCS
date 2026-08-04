@@ -107,6 +107,7 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
    /* Run time stack overflow checking is performed if
    configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
    called if a stack overflow is detected. */
+   printf("stack overflow occured in task %s\n", pcTaskName);
    while(1) {
     // stay here don't corrupt memory
    }
@@ -180,7 +181,7 @@ void StartReadIMU(void *argument)
 
   /* USER CODE BEGIN StartReadIMU */
     MessageQueue_t msg;
-    // float accel_pitch, accel_yaw;
+    float accel_pitch, accel_yaw;
     uint32_t hlw;
     char usb_buf[100];
     // osStatus_t os_status;
@@ -199,20 +200,21 @@ void StartReadIMU(void *argument)
     // This task is the highest priority task
     accel_burst_read(&accel_data);
     msg.timestamp = xTaskGetTickCount(); // uint32? 
-    // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
+    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
+    printf("accel_pitch: %.2f| accel_yaw: %.2f\n", accel_pitch, accel_yaw);
     msg.acc_x = accel_data.acc_x;
     msg.acc_y = accel_data.acc_y;
     msg.acc_z = accel_data.acc_z;
 
-    sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", msg.timestamp, accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
-    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
-      usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
-    }
+    // sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", msg.timestamp, accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
+    // if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
+    //   usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
+    // }
     osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
 
     osDelay(100); // 10Hz
-    hlw = uxTaskGetStackHighWaterMark(logHandle);
-    printf("%" PRIu32 "\r\n", hlw);
+    // hlw = uxTaskGetStackHighWaterMark(logHandle);
+    // printf("%" PRIu32 "\r\n", hlw);
   }
   /* USER CODE END StartReadIMU */
 }

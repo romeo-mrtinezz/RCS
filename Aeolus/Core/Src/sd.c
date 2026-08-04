@@ -188,6 +188,7 @@ void SD_Card_init() {
     if (FR_Status != FR_OK)
     {
         sprintf(TxBuffer, "Error! While Mounting SD Card, Error Code: (%i)\r\n", FR_Status);
+        printf("%s", TxBuffer);
         break;
     }
     sprintf(TxBuffer, "SD Card Mounted Successfully! \r\n\n");

@@ -39,4 +39,8 @@ typedef struct {
     float acc_z;
 } MessageQueue_t;
 
+// Functions
+void accel_to_angle(const AccData accel_data, float *accel_pitch, float *accel_yaw);
+
+
 #endif // __GLOBAL_H

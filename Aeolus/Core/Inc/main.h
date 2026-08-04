@@ -50,7 +50,6 @@ extern "C" {
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
-
 /* USER CODE BEGIN EFP */
 /* USER CODE END EFP */
 

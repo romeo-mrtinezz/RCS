@@ -49,6 +49,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/pid.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/bmi088.c
     Core/Src/sd.c
+    Core/Src/global.c
 )
 
 # Add include paths
