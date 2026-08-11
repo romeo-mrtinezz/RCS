@@ -33,6 +33,20 @@ typedef struct {
 } Attitude;
 
 typedef struct {
+    uint32_t timestamp; // ms
+    float rate_x;
+    float rate_y;
+    float rate_z;
+    float acc_x;
+    float acc_y;
+    float acc_z; 
+    float pitch_accel;
+    float yaw_accel; // add pitch/yaw gyro too if needed
+    float pitch;
+    float yaw;
+} FullData;
+
+typedef struct {
     uint32_t timestamp;
     float acc_x;
     float acc_y;

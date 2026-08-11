@@ -125,11 +125,10 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   // MX_USB_Device_Init(); // <-------------------------------------------------
-  // HAL_Delay(1000);
+
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
-  uint8_t pls = accel_init();
-  if (pls != 30) {
+  if (accel_init() != 30) {
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
 
@@ -142,7 +141,7 @@ int main(void)
   // SD_Card_Test();
   // SD_Card_Write();
   float accel_pitch, accel_yaw;
-  float prev_pitch = 0, prev_yaw = 0;
+  // float prev_pitch = 0, prev_yaw = 0;
   PID_params pid;
   pid_init(&pid); 
 

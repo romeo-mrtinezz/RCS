@@ -19,6 +19,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
+#include "PID.h"
 #include "stm32g4xx_hal.h"
 #include "task.h"
 #include "main.h"
@@ -187,6 +188,8 @@ void StartReadIMU(void *argument)
     char usb_buf[100];
     // osStatus_t os_status;
     uint8_t usb_status;
+    float prev_pitch = 0, prev_yaw = 0;
+    float curr_pitch, curr_yaw;
 
   /* Infinite loop */
   for(;;)
@@ -199,23 +202,33 @@ void StartReadIMU(void *argument)
     }
         
     // This task is the highest priority task
-    // accel_burst_read(&accel_data);
-    gyro_burst_read(&gyro_data);
-    msg.timestamp = xTaskGetTickCount(); // uint32? 
-    sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, gyro_data.rate_x, gyro_data.rate_y, gyro_data.rate_z);
-
-    // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
+    accel_burst_read(&accel_data);
+    gyro_burst_read(&gyro_data); 
+    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
     // printf("accel_pitch: %.2f| accel_yaw: %.2f\n", accel_pitch, accel_yaw);
-    msg.acc_x = accel_data.acc_x;
-    msg.acc_y = accel_data.acc_y;
-    msg.acc_z = accel_data.acc_z;
+
+    curr_pitch = comp_filter(1, 0.1, prev_pitch, gyro_data.rate_z, accel_pitch);
+    curr_yaw = comp_filter(1, 0.1, prev_yaw, gyro_data.rate_y, accel_yaw); // could be gyro z?
+    prev_pitch = curr_pitch;
+    prev_yaw = curr_yaw;
+    msg.timestamp = xTaskGetTickCount(); // uint32? 
+    printf("%.lu,%.2f,%.2f\n", msg.timestamp, curr_pitch, curr_yaw);
+
+    // sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, gyro_data.rate_x, gyro_data.rate_y, gyro_data.rate_z);
+    // sprintf(usb_buf, "%lu,%.2f,%.2f\n", msg.timestamp, curr_pitch, curr_yaw);
+    // printf("%lu,%.2f,%.2f\n", msg.timestamp, accel_pitch, accel_yaw);
+
+    msg.acc_x = accel_data.acc_x + 5;
+    msg.acc_y = accel_data.acc_y + 35;
+    msg.acc_z = accel_data.acc_z+ 28;
+    // printf("%lu,%.2f,%.2f,%.2f\n", msg.timestamp, msg.acc_x, msg.acc_y, msg.acc_z);
 
     // sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, msg.acc_x, msg.acc_y, msg.acc_z);
     // sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", msg.timestamp, accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
-    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
-      usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
-    }
-    osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
+    // if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
+    //   usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
+    // }
+    // osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
 
     osDelay(100); // 10Hz
     // hlw = uxTaskGetStackHighWaterMark(logHandle);
@@ -234,27 +247,27 @@ void StartReadIMU(void *argument)
 void StartLog(void *argument)
 {
   /* USER CODE BEGIN StartLog */
-  MessageQueue_t buffer[12];
-  SD_Card_init();
-  uint32_t hlw;
+  // MessageQueue_t buffer[12];
+  // SD_Card_init();
+  // uint32_t hlw;
 
-  /* Infinite loop */
+  // /* Infinite loop */
   for(;;)
   {
-    // 0 timeout means will return immediately - I want this because I want to maintain the 1Hz
-    // There are 12 elements in buffer, so there should always be 10 in there anyways since I'm reading at 10Hz
-    uint8_t count = 0;
-    // This ensures that the program doesnt interrup the usb tranmsit and get stuck waiting for queue to filled up
-    while (count < 10 && osMessageQueueGet(messageQueueHandle, &buffer[count], NULL, osWaitForever) == osOK) {
-        count++;
-        HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
-        osDelay(1);
-        HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
-        osDelay(1);
+  //   // 0 timeout means will return immediately - I want this because I want to maintain the 1Hz
+  //   // There are 12 elements in buffer, so there should always be 10 in there anyways since I'm reading at 10Hz
+  //   uint8_t count = 0;
+  //   // This ensures that the program doesnt interrup the usb tranmsit and get stuck waiting for queue to filled up
+  //   while (count < 10 && osMessageQueueGet(messageQueueHandle, &buffer[count], NULL, osWaitForever) == osOK) {
+  //       count++;
+  //       HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
+  //       osDelay(1);
+  //       HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
+  //       osDelay(1);
 
-    }
-    // semaphore here?
-    log_accel(count, buffer, osThreadGetId());
+  //   }
+  //   // semaphore here?
+  //   log_accel(count, buffer, osThreadGetId());
     // post semaphore, this is so 
     // hlw = uxTaskGetStackHighWaterMark(readIMUHandle);
     // printf("hlw: %" PRIu32 "\r\n", hlw);

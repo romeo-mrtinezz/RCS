@@ -28,7 +28,7 @@ because it would for the varying duty cycles to take effect
 // extern TIM_HandleTypeDef htim1;
 
 // Just 1 axis for now
-float comp_filter(float alpha, int dt, float prev_angle, float gyro_rate, float accel_angle) {
+float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, float accel_angle) {
     float angle = alpha*(prev_angle + gyro_rate * dt) + (1-alpha)*accel_angle;
     return angle;
 }
