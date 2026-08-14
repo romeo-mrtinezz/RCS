@@ -27,9 +27,8 @@ typedef struct {
 } AccData;
 
 typedef struct {
-    float pitch;
-    float yaw;
-    int dt;
+    float est_pitch;
+    float est_yaw;
 } Attitude;
 
 typedef struct {

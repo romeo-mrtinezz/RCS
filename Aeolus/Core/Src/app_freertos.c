@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
 #include "PID.h"
+#include "cmsis_os2.h"
 #include "stm32g4xx_hal.h"
 #include "task.h"
 #include "main.h"
@@ -54,6 +55,8 @@ extern uint32_t received_length;
 /* USER CODE BEGIN PD */
 extern AccData accel_data;
 extern GyroData gyro_data;
+extern PID_params pid_pitch;
+extern PID_params pid_yaw;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -147,7 +150,7 @@ void MX_FREERTOS_Init(void) {
   // messageQueueHandle = osMessageQueueNew (12, sizeof(uint16_t), &messageQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  messageQueueHandle = osMessageQueueNew (12, sizeof(MessageQueue_t), &messageQueue_attributes);
+  messageQueueHandle = osMessageQueueNew (12, sizeof(Attitude), &messageQueue_attributes);
 
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -182,13 +185,13 @@ void StartReadIMU(void *argument)
   MX_USB_Device_Init();
 
   /* USER CODE BEGIN StartReadIMU */
-    MessageQueue_t msg;
+    Attitude attitude;
     float accel_pitch, accel_yaw;
-    uint32_t hlw;
+    // uint32_t hlw;
     char usb_buf[100];
     // osStatus_t os_status;
     uint8_t usb_status;
-    float prev_pitch = 0, prev_yaw = 0;
+    float prev_pitch = 0, prev_yaw = 0;  
     float curr_pitch, curr_yaw;
 
   /* Infinite loop */
@@ -197,44 +200,38 @@ void StartReadIMU(void *argument)
     if (received_flag == 1) {
       received_flag = 0;
       if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
-        // TIM1->CCR1 = 100;
+        TIM1->CCR1 = 10000; // ARR is 10,000
         HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
         printf("valve opened\n"); }
       else if (strncmp((char*)UserRxBufferFS, "close", received_length) == 0) {
-        // TIM1->CCR1 = 0;
+        TIM1->CCR1 = 0;
         HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
         printf("valve closed\n");
       }
     }
         
     // This task is the highest priority task
+    // Read IMU
     accel_burst_read(&accel_data);
     gyro_burst_read(&gyro_data); 
-    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
-    // printf("accel_pitch: %.2f| accel_yaw: %.2f\n", accel_pitch, accel_yaw);
 
+    // Estimate euler angles
+    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
     curr_pitch = comp_filter(0.6, 0.1, prev_pitch, -gyro_data.rate_z, accel_pitch);
     curr_yaw = comp_filter(0.6, 0.1, prev_yaw, -gyro_data.rate_y, accel_yaw); // could be gyro z?
     prev_pitch = curr_pitch; 
     prev_yaw = curr_yaw;
-    msg.timestamp = xTaskGetTickCount(); // uint32? 
-    printf("%.lu,%.2f,%.2f\n", msg.timestamp, curr_pitch, curr_yaw);
 
-    // sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, gyro_data.rate_x, gyro_data.rate_y, gyro_data.rate_z);
-    // sprintf(usb_buf, "%lu,%.2f,%.2f\n", msg.timestamp, curr_pitch, curr_yaw);
-    // printf("%lu,%.2f,%.2f\n", msg.timestamp, accel_pitch, accel_yaw);
-
-    msg.acc_x = accel_data.acc_x + 5;
-    msg.acc_y = accel_data.acc_y + 35;
-    msg.acc_z = accel_data.acc_z+ 28;
-    // printf("%lu,%.2f,%.2f,%.2f\n", msg.timestamp, msg.acc_x, msg.acc_y, msg.acc_z);
+    // Construct payload/queue element to pass to PID controller and to log
+    attitude.est_pitch = curr_pitch;
+    attitude.est_yaw = curr_yaw;
 
     // sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, msg.acc_x, msg.acc_y, msg.acc_z);
-    // sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", msg.timestamp, accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
     // if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
-    //   usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
+    //   usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf)); // OR
+    //   printf("%lu,%.2f,%.2f\r\n",msg.timestamp,curr_pitch,curr_yaw); // Modify
     // }
-    // osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
+    osMessageQueuePut(messageQueueHandle, &attitude, 0, 0);
 
     osDelay(100); // 10Hz
     // hlw = uxTaskGetStackHighWaterMark(logHandle);
@@ -253,28 +250,35 @@ void StartReadIMU(void *argument)
 void StartLog(void *argument)
 {
   /* USER CODE BEGIN StartLog */
-  // MessageQueue_t buffer[12];
-  // SD_Card_init();
+  Attitude attitude_buf[12];
+  SD_Card_init();
+  pid_init(&pid_pitch);
+  pid_init(&pid_yaw);
   // uint32_t hlw;
-
+  float est_pitch, est_yaw;
   // /* Infinite loop */
   for(;;)
   {
-  //   // 0 timeout means will return immediately - I want this because I want to maintain the 1Hz
-  //   // There are 12 elements in buffer, so there should always be 10 in there anyways since I'm reading at 10Hz
-  //   uint8_t count = 0;
-  //   // This ensures that the program doesnt interrup the usb tranmsit and get stuck waiting for queue to filled up
-  //   while (count < 10 && osMessageQueueGet(messageQueueHandle, &buffer[count], NULL, osWaitForever) == osOK) {
-  //       count++;
-  //       HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
-  //       osDelay(1);
-  //       HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
-  //       osDelay(1);
+    // 0 timeout means will return immediately - I want this because I want to maintain the 1Hz
+    // There are 12 elements in buffer, so there should always be 10 in there anyways since I'm reading at 10Hz
+    uint8_t count = 0;
+    // This ensures that the program doesnt interrup the usb tranmsit and get stuck waiting for queue to filled up
+    // while (count < 10 && osMessageQueueGet(messageQueueHandle, &buffer[count], NULL, osWaitForever) == osOK) {
+    //     count++;
+    // }
 
-  //   }
-  //   // semaphore here?
-  //   log_accel(count, buffer, osThreadGetId());
-    // post semaphore, this is so 
+    // Implement extraction of attitude // TODO 
+    osMessageQueueGet(messageQueueHandle, &attitude_buf[12], NULL, osWaitForever);
+    est_pitch = attitude_buf[-1].est_pitch;
+    est_yaw = attitude_buf[-1].est_yaw;
+
+    pid_update(&pid_pitch, 0, est_pitch, 0.1);
+    pid_update(&pid_yaw, 0,  est_yaw, 0.1);
+    
+
+    // semaphore here?
+    // log_accel(count, buffer, osThreadGetId());
+    // post semaphore
     // hlw = uxTaskGetStackHighWaterMark(readIMUHandle);
     // printf("hlw: %" PRIu32 "\r\n", hlw);
     osDelay(1000); // 1Hz, every second

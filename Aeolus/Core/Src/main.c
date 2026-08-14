@@ -4,6 +4,7 @@
  * For More Info Visit: www.DeepBlueMbedded.com
 */
 #include "main.h"
+#include "PID.h"
 #include "cmsis_os.h"
 #include "adc.h"
 #include "app_fatfs.h"
@@ -44,6 +45,8 @@
 // extern osMessageQueueId_t messageQueueHandle;
 AccData accel_data;
 GyroData gyro_data;
+PID_params pid_pitch;
+PID_params pid_yaw;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -132,26 +135,16 @@ int main(void)
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
 
-  TIM1->CCR1 = 0;
+  // Set solenoid valves initially closed
+  TIM1->CCR1 = 0; // 5000 is 50% duty cycle for ARR = 10,000
   TIM1->CCR2 = 0;
-
-  // AccData accel_data;
-  // GyroData gyro_data;
-
-  // SD_Card_Test(); 
-  // SD_Card_Write();
-  float accel_pitch, accel_yaw;
-  // float prev_pitch = 0, prev_yaw = 0;
-  PID_params pid;
-  pid_init(&pid); 
-
   /* USER CODE END 2 */
 
-  /* Init scheduler */
+  // /* Init scheduler */
   osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
   MX_FREERTOS_Init();
 
-  /* Start scheduler */
+  // /* Start scheduler */
   osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
@@ -159,20 +152,7 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  { 
-    // accel_burst_read(&accel_data); 
-    // sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", HAL_GetTick(), accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
-    // CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
-    // HAL_Delay(250);
-  
-    // HAL_Delay(1000);
-    // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
-    // float pitch = comp_filter(0, 1, prev_pitch, gyro_data.rate_x, accel_pitch); // alpha = 1 means purely based on accel
-    // uint16_t pitch_duty = pid_update(&pid, 0, pitch, 1); 
-    // select_thruster(pid.error, pitch_duty, 0, 0, 1);
-    
-    // pwm_logic(accel_data.acc_y);
-    
+  {     
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
