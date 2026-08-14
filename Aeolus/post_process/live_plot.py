@@ -29,7 +29,7 @@ MODES = {
     3: {
         "signals": ["pitch", "yaw"],
         "ylabel": "Angle (deg)",
-        "ylim": (-180, 180),
+        "ylim": (-15, 15),
     },
 }
 
@@ -47,12 +47,12 @@ signals = mode["signals"]
 # --------------------------------------------------
 
 ser = serial.Serial(
-    "COM5",
+    "COM3",
     115200,
     timeout=0.01
 )
 
-print("Connected to COM5")
+print("Connected to COM3")
 print("Mode:", MODE)
 print("Signals:", signals)
 
@@ -224,3 +224,6 @@ while True:
 ser.close()
 
 print("Serial port closed.")
+
+# calibrate gyro
+# pitch yaw accel vs pitch gyro raw vs comp filt, GT 0, 45, 90

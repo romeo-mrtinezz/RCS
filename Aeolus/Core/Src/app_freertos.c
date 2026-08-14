@@ -196,9 +196,15 @@ void StartReadIMU(void *argument)
   {
     if (received_flag == 1) {
       received_flag = 0;
-      if(strncmp((char*)UserRxBufferFS, "ping", received_length) == 0) {
+      if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
+        // TIM1->CCR1 = 100;
         HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
-        printf("pong\n"); }
+        printf("valve opened\n"); }
+      else if (strncmp((char*)UserRxBufferFS, "close", received_length) == 0) {
+        // TIM1->CCR1 = 0;
+        HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+        printf("valve closed\n");
+      }
     }
         
     // This task is the highest priority task
@@ -207,9 +213,9 @@ void StartReadIMU(void *argument)
     accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
     // printf("accel_pitch: %.2f| accel_yaw: %.2f\n", accel_pitch, accel_yaw);
 
-    curr_pitch = comp_filter(1, 0.1, prev_pitch, gyro_data.rate_z, accel_pitch);
-    curr_yaw = comp_filter(1, 0.1, prev_yaw, gyro_data.rate_y, accel_yaw); // could be gyro z?
-    prev_pitch = curr_pitch;
+    curr_pitch = comp_filter(0.6, 0.1, prev_pitch, -gyro_data.rate_z, accel_pitch);
+    curr_yaw = comp_filter(0.6, 0.1, prev_yaw, -gyro_data.rate_y, accel_yaw); // could be gyro z?
+    prev_pitch = curr_pitch; 
     prev_yaw = curr_yaw;
     msg.timestamp = xTaskGetTickCount(); // uint32? 
     printf("%.lu,%.2f,%.2f\n", msg.timestamp, curr_pitch, curr_yaw);

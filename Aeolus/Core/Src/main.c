@@ -138,7 +138,7 @@ int main(void)
   // AccData accel_data;
   // GyroData gyro_data;
 
-  // SD_Card_Test();
+  // SD_Card_Test(); 
   // SD_Card_Write();
   float accel_pitch, accel_yaw;
   // float prev_pitch = 0, prev_yaw = 0;

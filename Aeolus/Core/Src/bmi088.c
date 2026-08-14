@@ -102,7 +102,7 @@ void accel_burst_read(AccData * accel_data) {
   accel_data->acc_z = (int16_t)(acc_buffer[5] << 8 | acc_buffer[4])/32768.0f * 1000.0f * 4.0f * 1.5f;
 };
 
-void gyro_burst_read(GyroData * gyro_data) {
+void gyro_burst_read(GyroData *gyro_data) {
   uint8_t byte_1 = RATE_X_LSB | 0x80; // R mode
   uint8_t gyro_buffer[6]; // 6 bytes of data
 
