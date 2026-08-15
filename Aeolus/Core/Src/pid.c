@@ -27,6 +27,8 @@ because it would for the varying duty cycles to take effect
 #include "global.h"
 // extern TIM_HandleTypeDef htim1;
 
+
+
 // Just 1 axis for now
 float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, float accel_angle) {
     float angle = alpha*(prev_angle + gyro_rate * dt) + (1-alpha)*accel_angle;
@@ -70,7 +72,7 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
 void select_thruster(float pitch_error, float pitch_duty, float yaw_error, float yaw_duty, float dt) {
     // map PWM to total impulse desired? thrust*seconds. maybe not needed tbh.
     // just use this to choose which thruster to fire
-    int ACCEPTABLE = 10; // degrees?
+    int ACCEPTABLE = 5; // degrees?
     if (pitch_error < -ACCEPTABLE) {
         // actuate pitch thruster in +ve
         TIM1->CCR1 = pitch_duty; 

@@ -50,6 +50,7 @@ extern "C" {
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
+
 /* USER CODE BEGIN EFP */
 /* USER CODE END EFP */
 
@@ -68,6 +69,8 @@ void Error_Handler(void);
 #define RED_LED_GPIO_Port GPIOA
 #define BLUE_LED_Pin GPIO_PIN_1
 #define BLUE_LED_GPIO_Port GPIOA
+#define SAFE_Pin GPIO_PIN_2
+#define SAFE_GPIO_Port GPIOA
 #define PT1_IN_Pin GPIO_PIN_4
 #define PT1_IN_GPIO_Port GPIOA
 #define CS_GYRO_Pin GPIO_PIN_4
@@ -80,6 +83,8 @@ void Error_Handler(void);
 #define ACCEL_INTR_GPIO_Port GPIOB
 #define PT2_IN_Pin GPIO_PIN_2
 #define PT2_IN_GPIO_Port GPIOB
+#define BUZZER_Pin GPIO_PIN_10
+#define BUZZER_GPIO_Port GPIOB
 #define CS_SD_Pin GPIO_PIN_6
 #define CS_SD_GPIO_Port GPIOC
 #define EXTRA_TX_Pin GPIO_PIN_9
@@ -96,8 +101,6 @@ void Error_Handler(void);
 #define RS422_TX_GPIO_Port GPIOC
 #define RS422_RX_Pin GPIO_PIN_2
 #define RS422_RX_GPIO_Port GPIOD
-#define CS_TC_Pin GPIO_PIN_5
-#define CS_TC_GPIO_Port GPIOB
 #define RFD_CTS_Pin GPIO_PIN_7
 #define RFD_CTS_GPIO_Port GPIOB
 

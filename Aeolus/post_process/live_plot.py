@@ -29,7 +29,7 @@ MODES = {
     3: {
         "signals": ["pitch", "yaw"],
         "ylabel": "Angle (deg)",
-        "ylim": (-15, 15),
+        "ylim": (-45, 45),
     },
 }
 

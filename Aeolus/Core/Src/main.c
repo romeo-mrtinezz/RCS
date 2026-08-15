@@ -1,10 +1,23 @@
-/*
- * LAB Name: STM32 SD Card SPI Interfacing Example
- * Author: Khaled Magdy
- * For More Info Visit: www.DeepBlueMbedded.com
-*/
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2026 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "PID.h"
 #include "cmsis_os.h"
 #include "adc.h"
 #include "app_fatfs.h"
@@ -47,6 +60,8 @@ AccData accel_data;
 GyroData gyro_data;
 PID_params pid_pitch;
 PID_params pid_yaw;
+Attitude attitude;
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -107,7 +122,21 @@ int _write(int file, char *ptr, int len) {
   */
 int main(void)
 {
-  HAL_Init();
+
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+   HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
@@ -122,10 +151,10 @@ int main(void)
     Error_Handler();
   }
   MX_ADC2_Init();
-  MX_SPI3_Init();
   MX_UART4_Init();
   MX_UART5_Init();
   MX_USART1_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   // MX_USB_Device_Init(); // <-------------------------------------------------
 
@@ -140,11 +169,11 @@ int main(void)
   TIM1->CCR2 = 0;
   /* USER CODE END 2 */
 
-  // /* Init scheduler */
+  /* Init scheduler */
   osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
   MX_FREERTOS_Init();
 
-  // /* Start scheduler */
+  /* Start scheduler */
   osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
