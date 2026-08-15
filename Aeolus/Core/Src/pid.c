@@ -50,7 +50,7 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
 
     float P = pid->Kp*error;
     float I = pid->Ki*pid->integral;
-    float D = (error-pid->prev_error)/dt;
+    float D = pid->Kd*(error-pid->prev_error)/dt;
     pid->prev_error = error;
 
     float control = P+I+D; 
