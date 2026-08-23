@@ -57,6 +57,7 @@ extern GyroData gyro_data;
 extern PID_params pid_pitch;
 extern PID_params pid_yaw;
 extern Attitude attitude;
+extern FullData full_data;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -158,7 +159,6 @@ void MX_FREERTOS_Init(void) {
   messageQueueHandle = osMessageQueueNew (12, sizeof(uint16_t), &messageQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  messageQueueHandle = osMessageQueueNew (12, sizeof(Attitude), &messageQueue_attributes);
 
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -226,13 +226,23 @@ void StartReadIMU(void *argument)
 
     // Write to shared struct safely to pass to PID controller and to log
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
-    attitude.est_pitch = curr_pitch;
-    attitude.est_yaw = curr_yaw;
+    // attitude.est_pitch = curr_pitch;
+    // attitude.est_yaw = curr_yaw;
+
+    full_data.rate_x = gyro_data.rate_x;
+    full_data.rate_y = gyro_data.rate_y;
+    full_data.rate_z = gyro_data.rate_z;
+    full_data.acc_x = accel_data.acc_x;
+    full_data.acc_y = accel_data.acc_y;
+    full_data.acc_z = accel_data.acc_z;
+    full_data.pitch_accel = accel_pitch;
+    full_data.yaw_accel = accel_yaw;
+    full_data.pitch = curr_pitch;
+    full_data.yaw = curr_yaw;
     osMutexRelease(AttitudeMutexHandle);
 
     // sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, msg.acc_x, msg.acc_y, msg.acc_z);
 
-    osMessageQueuePut(messageQueueHandle, &attitude, 0, 0);
 
     osDelay(10); // 100Hz
     // hlw = uxTaskGetStackHighWaterMark(logHandle);
@@ -269,9 +279,22 @@ void StartLog(void *argument)
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
     pitch_duty = pid_update(&pid_pitch, 0, attitude.est_pitch, 0.1);
     yaw_duty = pid_update(&pid_yaw, 0,  attitude.est_yaw, 0.1);
-     if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
-    //   usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf)); // OR
-      printf("%lu,%.2f,%.2f\r\n",xTaskGetTickCount(),attitude.est_pitch,attitude.est_yaw); // Modify
+    full_data.pitch_error = pid_pitch.error;
+    full_data.yaw_error = pid_yaw.error;
+    full_data.pitch_duty = pitch_duty;
+    full_data.yaw_duty = yaw_duty;
+
+    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
+      // usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf)); // OR
+      printf("%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+        xTaskGetTickCount(),
+        full_data.rate_x, full_data.rate_y, full_data.rate_z,
+        full_data.acc_x, full_data.acc_y, full_data.acc_z,
+        full_data.pitch_accel, full_data.yaw_accel,
+        full_data.pitch, full_data.yaw,
+        full_data.pitch_error, full_data.yaw_error,
+        full_data.pitch_duty, full_data.yaw_duty
+      ); // Modify
     }
     osMutexRelease(AttitudeMutexHandle);
 

@@ -13,7 +13,7 @@ import pandas as pd
 
 # Enter file name to parse
 # file = input("Type filename in the form <example.csv>\n")
-df = pd.read_csv(r"C:\Users\romeo\OneDrive\Desktop\RCS\Aeolus\post_process\test.csv", header=None, delimiter=",", dtype=np.float32)
+df = pd.read_csv(r"C:\Users\romeo\OneDrive\Desktop\RCS\Aeolus\post_process\COM3_2026_08_23.23.02.48.264.csv", header=None, delimiter=",", dtype=np.float32)
 
 columns = {
     "Timestamp"    : df.iloc[:,0],
@@ -29,10 +29,11 @@ columns = {
     "Yaw"          : df.iloc[:,10],
     "Pitch_error"  : df.iloc[:,11],
     "Yaw_error"    : df.iloc[:,12],
-    "Control_duty" : df.iloc[:,13]
+    "Pitch_duty"   : df.iloc[:,13],
+    "Yaw_duty"     : df.iloc[:,14]
 }
 
-desired = ["Rate_x","Rate_y"]
+desired = ["Acc_x","Acc_y", "Acc_z"]
 
 # Plot on same axes
 def plot_multiple(timestamp, columns: dict, desired: list[str], title = None, ylabel = None):
@@ -54,7 +55,6 @@ def plot_multiple(timestamp, columns: dict, desired: list[str], title = None, yl
 
 def main():
     # plot_one(timestamp, pitch, "Pitch")
-    plot_multiple(columns["Timestamp"], columns, desired)
     plot_multiple(columns["Timestamp"], columns, desired)
     plt.show()
 

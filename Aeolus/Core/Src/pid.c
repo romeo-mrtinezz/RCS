@@ -25,6 +25,7 @@ because it would for the varying duty cycles to take effect
 #include "PID.h"
 #include "main.h"
 #include "global.h"
+#include <stdlib.h>
 // extern TIM_HandleTypeDef htim1;
 
 

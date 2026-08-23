@@ -61,6 +61,7 @@ GyroData gyro_data;
 PID_params pid_pitch;
 PID_params pid_yaw;
 Attitude attitude;
+FullData full_data;
 
 /* USER CODE END PD */
 
