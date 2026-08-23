@@ -35,7 +35,7 @@ columns = {
 desired = ["Rate_x","Rate_y"]
 
 # Plot on same axes
-def plot_multiple(timestamp, columns: dict, desired: list[str]):
+def plot_multiple(timestamp, columns: dict, desired: list[str], title = None, ylabel = None):
     fig, ax = plt.subplots()
 
     for variable in desired: # check if variable is a dictionary key
@@ -43,14 +43,20 @@ def plot_multiple(timestamp, columns: dict, desired: list[str]):
             ax.plot(timestamp, columns[variable], label=variable)
 
     ax.set_xlabel("Time (ms)")
+    if isinstance(title, str):
+        ax.set_title(title)
+    if isinstance(ylabel, str):
+        ax.set_ylabel(ylabel)
+
     ax.grid()
     ax.legend()
-    plt.show()
+
 
 def main():
     # plot_one(timestamp, pitch, "Pitch")
     plot_multiple(columns["Timestamp"], columns, desired)
+    plot_multiple(columns["Timestamp"], columns, desired)
+    plt.show()
 
 if __name__ == "__main__":
     main()
-    
