@@ -29,7 +29,9 @@ because it would for the varying duty cycles to take effect
 
 
 
-// Just 1 axis for now
+/*
+Produces filtered angle in 1 axis, i.e. call twice for pitch and yaw 
+*/
 float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, float accel_angle) {
     float angle = alpha*(prev_angle + gyro_rate * dt) + (1-alpha)*accel_angle;
     return angle;
@@ -89,10 +91,10 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
     D = -100
     prev_error = 10
     control = 706
-
     */
 
     float control = abs(P+I+D); // absolute value because we can't have -ve duty cycle
+    pid->control_duty = control;
 
     // Saturation and anti-windup back calculation to remove error 
     // accumulated in this timestep

@@ -11,6 +11,7 @@ typedef struct {
     float integral;
     float min_duty, max_duty;
     float error;
+    float control_duty;
 } PID_params;
 
 float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, float accel_angle);

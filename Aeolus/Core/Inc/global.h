@@ -43,6 +43,9 @@ typedef struct {
     float yaw_accel; // add pitch/yaw gyro too if needed
     float pitch;
     float yaw;
+    float pitch_error;
+    float yaw_error;
+    float control_duty;
 } FullData;
 
 typedef struct {
