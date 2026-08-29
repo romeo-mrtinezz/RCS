@@ -19,8 +19,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
-#include "PID.h"
-#include "cmsis_os2.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -189,6 +187,8 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_StartReadIMU */
 void StartReadIMU(void *argument)
 {
+  /* init code for USB_Device */
+  MX_USB_Device_Init();
   /* USER CODE BEGIN StartReadIMU */
     float accel_pitch, accel_yaw;
     // uint32_t hlw;

@@ -131,7 +131,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-   HAL_Init();
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -168,21 +168,27 @@ int main(void)
   // Set solenoid valves initially closed
   TIM1->CCR1 = 0; // 5000 is 50% duty cycle for ARR = 10,000
   TIM1->CCR2 = 0;
+
+  char msg[50] = "Hey";
+  HAL_StatusTypeDef status;
   /* USER CODE END 2 */
 
   /* Init scheduler */
-  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
-  MX_FREERTOS_Init();
+  // osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  // MX_FREERTOS_Init();
 
   /* Start scheduler */
-  osKernelStart();
+  // osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  {     
+  { 
+    status = HAL_UART_Transmit(&huart4, (uint8_t *)msg, strlen(msg), 100);  
+    HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);  
+    HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

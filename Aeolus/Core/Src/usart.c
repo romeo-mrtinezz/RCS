@@ -45,7 +45,7 @@ void MX_UART4_Init(void)
   huart4.Init.StopBits = UART_STOPBITS_1;
   huart4.Init.Parity = UART_PARITY_NONE;
   huart4.Init.Mode = UART_MODE_TX_RX;
-  huart4.Init.HwFlowCtl = UART_HWCONTROL_RTS_CTS;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart4.Init.OverSampling = UART_OVERSAMPLING_16;
   huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart4.Init.ClockPrescaler = UART_PRESCALER_DIV1;
@@ -182,35 +182,17 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     /* UART4 clock enable */
     __HAL_RCC_UART4_CLK_ENABLE();
 
-    __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
     /**UART4 GPIO Configuration
-    PA15     ------> UART4_RTS
     PC10     ------> UART4_TX
     PC11     ------> UART4_RX
-    PB7     ------> UART4_CTS
     */
-    GPIO_InitStruct.Pin = RFD_RTS_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF8_UART4;
-    HAL_GPIO_Init(RFD_RTS_GPIO_Port, &GPIO_InitStruct);
-
     GPIO_InitStruct.Pin = RFD_TX_Pin|RFD_RX_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF5_UART4;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = RFD_CTS_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF14_UART4;
-    HAL_GPIO_Init(RFD_CTS_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN UART4_MspInit 1 */
 
@@ -306,16 +288,10 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
     __HAL_RCC_UART4_CLK_DISABLE();
 
     /**UART4 GPIO Configuration
-    PA15     ------> UART4_RTS
     PC10     ------> UART4_TX
     PC11     ------> UART4_RX
-    PB7     ------> UART4_CTS
     */
-    HAL_GPIO_DeInit(RFD_RTS_GPIO_Port, RFD_RTS_Pin);
-
     HAL_GPIO_DeInit(GPIOC, RFD_TX_Pin|RFD_RX_Pin);
-
-    HAL_GPIO_DeInit(RFD_CTS_GPIO_Port, RFD_CTS_Pin);
 
   /* USER CODE BEGIN UART4_MspDeInit 1 */
 
