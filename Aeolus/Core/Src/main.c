@@ -169,6 +169,7 @@ int main(void)
   TIM1->CCR1 = 0; // 5000 is 50% duty cycle for ARR = 10,000
   TIM1->CCR2 = 0;
 
+  
   char msg[50] = "Hey";
   HAL_StatusTypeDef status;
   /* USER CODE END 2 */
