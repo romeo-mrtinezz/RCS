@@ -277,8 +277,8 @@ void StartLog(void *argument)
   {
     // Pass in attitude struct atomically
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
-    pitch_duty = pid_update(&pid_pitch, 0, attitude.est_pitch, 0.1);
-    yaw_duty = pid_update(&pid_yaw, 0,  attitude.est_yaw, 0.1);
+    pitch_duty = pid_update(&pid_pitch, 0, full_data.pitch, 0.1);
+    yaw_duty = pid_update(&pid_yaw, 0,  full_data.yaw, 0.1);
     full_data.pitch_error = pid_pitch.error;
     full_data.yaw_error = pid_yaw.error;
     full_data.pitch_duty = pitch_duty;
