@@ -23,7 +23,7 @@
 #include "dma.h"
 #include "app_fatfs.h"
 #include "spi.h"
-#include "stm32g4xx_hal_uart.h"
+#include "stm32g4xx_hal_adc.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -77,6 +77,7 @@ FullData full_data;
 /* USER CODE BEGIN PV */
 volatile uint8_t rx_flag = 0;
 char rx_buf[20];
+volatile uint8_t adc_flag = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -119,6 +120,10 @@ void pwm_logic(float acc_y) {
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
   rx_flag = 1;
+}
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
+  adc_flag = 1;
 }
 /* USER CODE END PFP */
 
@@ -181,16 +186,19 @@ int main(void)
 
   char msg[50] = "Hey";
   HAL_StatusTypeDef status;
+  volatile uint16_t adc_val[2];
+  uint16_t high_pressure;
+  uint16_t low_pressure;
   
   HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
   /* USER CODE END 2 */
 
-  /* Init scheduler */
-  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
-  MX_FREERTOS_Init();
+  // /* Init scheduler */
+  // osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  // MX_FREERTOS_Init();
 
-  /* Start scheduler */
-  osKernelStart();
+  // /* Start scheduler */
+  // osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
@@ -198,6 +206,14 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
+    HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
+    high_pressure = adc_val[0];
+    low_pressure = adc_val[1];
+    if (adc_flag) {
+      HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+      adc_flag = 0;
+    }
+    HAL_Delay(1000);
     // status = HAL_UART_Transmit(&huart4, (uint8_t *)msg, strlen(msg), 100);  
     // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);  
     // HAL_Delay(1000);

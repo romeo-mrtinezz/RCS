@@ -55,6 +55,7 @@ extern uint16_t Timer1, Timer2;
 
 /* External variables --------------------------------------------------------*/
 extern PCD_HandleTypeDef hpcd_USB_FS;
+extern DMA_HandleTypeDef hdma_adc2;
 extern DMA_HandleTypeDef hdma_uart4_rx;
 extern TIM_HandleTypeDef htim6;
 
@@ -172,6 +173,20 @@ void DMA1_Channel1_IRQHandler(void)
   /* USER CODE BEGIN DMA1_Channel1_IRQn 1 */
 
   /* USER CODE END DMA1_Channel1_IRQn 1 */
+}
+
+/**
+  * @brief This function handles DMA1 channel2 global interrupt.
+  */
+void DMA1_Channel2_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Channel2_IRQn 0 */
+
+  /* USER CODE END DMA1_Channel2_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_adc2);
+  /* USER CODE BEGIN DMA1_Channel2_IRQn 1 */
+
+  /* USER CODE END DMA1_Channel2_IRQn 1 */
 }
 
 /**

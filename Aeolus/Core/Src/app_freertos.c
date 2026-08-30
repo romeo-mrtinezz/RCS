@@ -18,17 +18,16 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
 #include "FreeRTOS.h"
-#include "stm32g4xx_hal_uart.h"
 #include "task.h"
+#include "main.h"
 #include "cmsis_os.h"
 
-#include "usart.h"
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "usart.h"
 #include "pid.h"
 #include "bmi088.h"
 #include "sd.h"
