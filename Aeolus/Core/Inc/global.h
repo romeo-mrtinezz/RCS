@@ -27,11 +27,14 @@ typedef struct {
 } AccData;
 
 typedef struct {
-    float pitch;
-    float yaw;
-    int dt;
+    float est_pitch;
+    float est_yaw;
 } Attitude;
 
+/*
+    Data to stream, max data rate of RFD900ux is 224kbps.
+    Total below is 480bits I believe. * 10Hz that's 4.8kbps, so plenty of margin
+*/
 typedef struct {
     uint32_t timestamp; // ms
     float rate_x;
@@ -44,6 +47,11 @@ typedef struct {
     float yaw_accel; // add pitch/yaw gyro too if needed
     float pitch;
     float yaw;
+
+    float pitch_error;
+    float yaw_error;
+    float pitch_duty;
+    float yaw_duty;
 } FullData;
 
 typedef struct {

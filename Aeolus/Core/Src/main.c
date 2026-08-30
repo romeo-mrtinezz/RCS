@@ -1,13 +1,29 @@
-/*
- * LAB Name: STM32 SD Card SPI Interfacing Example
- * Author: Khaled Magdy
- * For More Info Visit: www.DeepBlueMbedded.com
-*/
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2026 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
 #include "adc.h"
+#include "dma.h"
 #include "app_fatfs.h"
 #include "spi.h"
+#include "stm32g4xx_hal_uart.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -32,6 +48,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <math.h>
+#include <sys/_intsup.h>
 
 /* USER CODE END Includes */
 
@@ -44,6 +61,11 @@
 // extern osMessageQueueId_t messageQueueHandle;
 AccData accel_data;
 GyroData gyro_data;
+PID_params pid_pitch;
+PID_params pid_yaw;
+Attitude attitude;
+FullData full_data;
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -53,6 +75,8 @@ GyroData gyro_data;
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+volatile uint8_t rx_flag = 0;
+char rx_buf[20];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -85,12 +109,16 @@ void pwm_logic(float acc_y) {
 
 }
 
-int _write(int file, char *ptr, int len) {
-  while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
-    HAL_Delay(1);
-  }
+// int _write(int file, char *ptr, int len) {
+//   while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
+//     HAL_Delay(1);
+//   }
 
-  return(len);
+//   return(len);
+// }
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+  HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+  rx_flag = 1;
 }
 /* USER CODE END PFP */
 
@@ -104,7 +132,21 @@ int _write(int file, char *ptr, int len) {
   */
 int main(void)
 {
+
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
@@ -112,6 +154,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI1_Init();
   MX_SPI2_Init();
   MX_TIM1_Init();
@@ -119,10 +162,10 @@ int main(void)
     Error_Handler();
   }
   MX_ADC2_Init();
-  MX_SPI3_Init();
   MX_UART4_Init();
   MX_UART5_Init();
   MX_USART1_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   // MX_USB_Device_Init(); // <-------------------------------------------------
 
@@ -132,19 +175,14 @@ int main(void)
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
 
-  TIM1->CCR1 = 0;
+  // Set solenoid valves initially closed
+  TIM1->CCR1 = 0; // 5000 is 50% duty cycle for ARR = 10,000
   TIM1->CCR2 = 0;
 
-  // AccData accel_data;
-  // GyroData gyro_data;
-
-  // SD_Card_Test(); 
-  // SD_Card_Write();
-  float accel_pitch, accel_yaw;
-  // float prev_pitch = 0, prev_yaw = 0;
-  PID_params pid;
-  pid_init(&pid); 
-
+  char msg[50] = "Hey";
+  HAL_StatusTypeDef status;
+  
+  HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -160,19 +198,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    // accel_burst_read(&accel_data); 
-    // sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", HAL_GetTick(), accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
-    // CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
-    // HAL_Delay(250);
-  
+    // status = HAL_UART_Transmit(&huart4, (uint8_t *)msg, strlen(msg), 100);  
+    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);  
     // HAL_Delay(1000);
-    // accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
-    // float pitch = comp_filter(0, 1, prev_pitch, gyro_data.rate_x, accel_pitch); // alpha = 1 means purely based on accel
-    // uint16_t pitch_duty = pid_update(&pid, 0, pitch, 1); 
-    // select_thruster(pid.error, pitch_duty, 0, 0, 1);
-    
-    // pwm_logic(accel_data.acc_y);
-    
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

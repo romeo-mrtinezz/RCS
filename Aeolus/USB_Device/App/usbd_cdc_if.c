@@ -20,10 +20,9 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_cdc_if.h"
-#include <stdint.h>
 
 /* USER CODE BEGIN INCLUDE */
-
+#include <stdint.h>
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/

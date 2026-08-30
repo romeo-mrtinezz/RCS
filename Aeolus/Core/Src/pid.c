@@ -25,9 +25,14 @@ because it would for the varying duty cycles to take effect
 #include "PID.h"
 #include "main.h"
 #include "global.h"
+#include <stdlib.h>
 // extern TIM_HandleTypeDef htim1;
 
-// Just 1 axis for now
+
+
+/*
+Produces filtered angle in 1 axis, i.e. call twice for pitch and yaw 
+*/
 float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, float accel_angle) {
     float angle = alpha*(prev_angle + gyro_rate * dt) + (1-alpha)*accel_angle;
     return angle;
@@ -35,10 +40,10 @@ float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, floa
 
 // pass in pointer to pid so we can update them directly instead of making 100 copies
 void pid_init(PID_params *pid) {
-    pid->Kp = 800, pid->Ki = 0, pid->Kd = 0;
+    pid->Kp = 130, pid->Ki = 0, pid->Kd = 0;
     pid -> integral = 0;
     pid -> prev_error = 0; 
-    pid->min_duty = 3800, pid->max_duty = 6200; // Duty cycle max
+    pid->min_duty = 0, pid->max_duty = 10000; // Duty cycle max 3800 6200
 }
 
 float pid_update(PID_params *pid, float set_point, float angle_estimate, float dt) {
@@ -48,10 +53,51 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
 
     float P = pid->Kp*error;
     float I = pid->Ki*pid->integral;
-    float D = (error-pid->prev_error)/dt;
+    float D = pid->Kd*(error-pid->prev_error)/dt;
     pid->prev_error = error;
 
-    float control = P+I+D; 
+    /*The following should produce the same magnitude of control signal, the select thruster logic is a separate function
+    for kp = 80, ki = 2, kd = 2
+    
+    LOOP 1
+    error  = -20 deg
+    integral = -2
+    P = -1600
+    I = -4
+    D = -200
+    prev_error = -20 deg
+    control = -1804
+
+    LOOP 2
+    error = -10 deg
+    integral = -3
+    P = -800
+    I = -6
+    D = 100
+    prev_error = -10
+    control = -706
+
+    LOOP 1
+    error = 20 deg
+    integral = 2
+    P = 1600
+    I = 4
+    D = 200
+    prev_error = 20 deg
+    control = 1804
+
+    LOOP 2
+    error = 10 deg
+    integral = 3
+    P = 800
+    I = 6
+    D = -100
+    prev_error = 10
+    control = 706
+    */
+
+    float control = abs(P+I+D); // absolute value because we can't have -ve duty cycle
+    pid->control_duty = control;
 
     // Saturation and anti-windup back calculation to remove error 
     // accumulated in this timestep
@@ -69,8 +115,7 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
 
 void select_thruster(float pitch_error, float pitch_duty, float yaw_error, float yaw_duty, float dt) {
     // map PWM to total impulse desired? thrust*seconds. maybe not needed tbh.
-    // just use this to choose which thruster to fire
-    int ACCEPTABLE = 10; // degrees?
+    int ACCEPTABLE = 5; // degrees
     if (pitch_error < -ACCEPTABLE) {
         // actuate pitch thruster in +ve
         TIM1->CCR1 = pitch_duty; 

@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 from collections import deque
 import time
 
-
 """
 Mode
 1: acceleration
@@ -13,49 +12,42 @@ Mode
 
 MODE = 3
 
-MODES = {
-    1: {
-        "signals": ["ax", "ay", "az"],
-        "ylabel": "Acceleration (mg)",
-        "ylim": (-2000, 2000),
-    },
+# Full struct layout as streamed from the board
+FIELDS = [
+    "Timestamp", "Rate_x", "Rate_y", "Rate_z",
+    "Acc_x", "Acc_y", "Acc_z",
+    "Pitch_accel", "Yaw_accel",
+    "Pitch", "Yaw",
+    "Pitch_error", "Yaw_error",
+    "Pitch_duty", "Yaw_duty",
+]
+FIELD_INDEX = {name: i for i, name in enumerate(FIELDS)}
 
-    2: {
-        "signals": ["gx", "gy", "gz"],
-        "ylabel": "Angular velocity (deg/s)",
-        "ylim": (-500, 500),
-    },
-
-    3: {
-        "signals": ["pitch", "yaw"],
-        "ylabel": "Angle (deg)",
-        "ylim": (-15, 15),
-    },
+# Per-field scale factors applied on read (default 1.0 if not listed)
+SCALE = {
+    "Timestamp": 1 / 1000,   # ms -> s
+    "Pitch_duty": 1 / 100,   # raw -> %
 }
 
-
-# --------------------------------------------------
-# Mode
-# --------------------------------------------------
+MODES = {
+    1: {"signals": ["Acc_x", "Acc_y", "Acc_z"], "ylabel": "Acceleration (mg)", "ylim": (-2000, 2000)},
+    2: {"signals": ["Rate_x", "Rate_y", "Rate_z"], "ylabel": "Angular velocity (deg/s)", "ylim": (-500, 500)},
+    3: {"signals": ["Pitch", "Yaw"], "ylabel": "Angle (deg)", "ylim": (-45, 45)},
+    4: {"signals": ["Pitch_duty", "Yaw_duty"], "ylabel": "Duty (%)", "ylim": (-100, 100)},
+}
 
 mode = MODES[MODE]
 signals = mode["signals"]
-
 
 # --------------------------------------------------
 # Serial
 # --------------------------------------------------
 
-ser = serial.Serial(
-    "COM3",
-    115200,
-    timeout=0.01
-)
+ser = serial.Serial("COM3", 115200, timeout=0.01)
 
 print("Connected to COM3")
 print("Mode:", MODE)
 print("Signals:", signals)
-
 
 # --------------------------------------------------
 # Data storage
@@ -66,35 +58,23 @@ WINDOW = 5  # seconds
 
 samples = deque(maxlen=MAX_POINTS)
 
-
 # --------------------------------------------------
 # Plot setup
 # --------------------------------------------------
 
 plt.ion()
-
 fig, ax = plt.subplots()
 
 lines = {}
-
 for signal in signals:
-
-    lines[signal], = ax.plot(
-        [],
-        [],
-        label=signal
-    )
-
+    lines[signal], = ax.plot([], [], label=signal)
 
 ax.set_xlabel("Time (s)")
 ax.set_ylabel(mode["ylabel"])
 ax.set_title("Live IMU Data")
-
 ax.set_ylim(*mode["ylim"])
-
 ax.legend()
 ax.grid()
-
 
 # --------------------------------------------------
 # Main loop
@@ -103,19 +83,9 @@ ax.grid()
 last_plot = time.perf_counter()
 
 while True:
-
     try:
-
-        # ------------------------------------------
-        # Read all available serial data
-        # ------------------------------------------
-
         while ser.in_waiting:
-
-            line = ser.readline().decode(
-                "utf-8",
-                errors="ignore"
-            ).strip()
+            line = ser.readline().decode("utf-8", errors="ignore").strip()
 
             if not line:
                 continue
@@ -123,107 +93,46 @@ while True:
             print(line)
 
             try:
+                values = list(map(float, line.split(",")))
 
-                values = list(
-                    map(float, line.split(","))
-                )
-
-                # First value is always timestamp
-                # Remaining values are the signals
-
-                expected_values = len(signals) + 1
-
-                if len(values) != expected_values:
-
+                if len(values) != len(FIELDS):
                     print("Invalid packet:", line)
                     continue
 
-                # Store complete packet
                 samples.append(values)
 
             except ValueError:
-
                 print("Could not parse:", line)
                 continue
-
-
-        # ------------------------------------------
-        # Update graph ~30 FPS
-        # ------------------------------------------
 
         now = time.perf_counter()
 
         if now - last_plot >= 0.033:
 
             if len(samples) > 0:
+                times = [sample[FIELD_INDEX["Timestamp"]] / 1000.0 for sample in samples]
 
-                # Convert timestamp from ms -> s
-
-                times = [
-                    sample[0] / 1000.0
-                    for sample in samples
-                ]
-
-
-                # Update each signal
-
-                for i, signal in enumerate(signals):
-
-                    values = [
-                        sample[i + 1]
-                        for sample in samples
-                    ]
-
-                    lines[signal].set_data(
-                        times,
-                        values
-                    )
-
-
-                # ----------------------------------
-                # Rolling X axis
-                # ----------------------------------
+                for signal in signals:
+                    idx = FIELD_INDEX[signal]
+                    values = [sample[idx] for sample in samples]
+                    lines[signal].set_data(times, values)
 
                 if len(times) > 1:
-
                     current_time = times[-1]
-
-                    ax.set_xlim(
-                        max(0, current_time - WINDOW),
-                        current_time
-                    )
-
-
-                # ----------------------------------
-                # Fixed Y axis
-                # ----------------------------------
+                    ax.set_xlim(max(0, current_time - WINDOW), current_time)
 
                 ax.set_ylim(*mode["ylim"])
-
-
-                # ----------------------------------
-                # Redraw
-                # ----------------------------------
 
                 fig.canvas.draw_idle()
                 fig.canvas.flush_events()
 
-
             last_plot = now
-
 
         plt.pause(0.001)
 
-
     except KeyboardInterrupt:
-
         print("\nStopping...")
         break
 
-
 ser.close()
-
 print("Serial port closed.")
-
-# calibrate gyro
-# pitch yaw accel vs pitch gyro raw vs comp filt, GT 0, 45, 90

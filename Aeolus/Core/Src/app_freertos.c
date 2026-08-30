@@ -18,13 +18,13 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
-#include "FreeRTOS.h"
-#include "PID.h"
-#include "stm32g4xx_hal.h"
-#include "task.h"
 #include "main.h"
+#include "FreeRTOS.h"
+#include "stm32g4xx_hal_uart.h"
+#include "task.h"
 #include "cmsis_os.h"
 
+#include "usart.h"
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -34,11 +34,13 @@
 #include "sd.h"
 #include "global.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
 #include "usbd_def.h"
 #include <inttypes.h>
+#include <sys/_intsup.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,12 +50,18 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 extern uint8_t received_flag;
 extern uint32_t received_length;
+extern volatile uint8_t rx_flag;
+extern char rx_buf[20];
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 extern AccData accel_data;
 extern GyroData gyro_data;
+extern PID_params pid_pitch;
+extern PID_params pid_yaw;
+extern Attitude attitude;
+extern FullData full_data;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -83,6 +91,11 @@ const osThreadAttr_t log_attributes = {
 osMessageQueueId_t messageQueueHandle;
 const osMessageQueueAttr_t messageQueue_attributes = {
   .name = "messageQueue"
+};
+/* Definitions for AttitudeMutex */
+osMutexId_t AttitudeMutexHandle;
+const osMutexAttr_t AttitudeMutex_attributes = {
+  .name = "AttitudeMutex"
 };
 /* Definitions for testSemaphore */
 osSemaphoreId_t testSemaphoreHandle;
@@ -125,6 +138,9 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
+  /* Create the mutex(es) */
+  /* creation of AttitudeMutex */
+  AttitudeMutexHandle = osMutexNew(&AttitudeMutex_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -144,10 +160,9 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of messageQueue */
-  // messageQueueHandle = osMessageQueueNew (12, sizeof(uint16_t), &messageQueue_attributes);
+  messageQueueHandle = osMessageQueueNew (12, sizeof(uint16_t), &messageQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  messageQueueHandle = osMessageQueueNew (12, sizeof(MessageQueue_t), &messageQueue_attributes);
 
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -180,15 +195,11 @@ void StartReadIMU(void *argument)
 {
   /* init code for USB_Device */
   MX_USB_Device_Init();
-
   /* USER CODE BEGIN StartReadIMU */
-    MessageQueue_t msg;
     float accel_pitch, accel_yaw;
-    uint32_t hlw;
-    char usb_buf[100];
+    // uint32_t hlw;
     // osStatus_t os_status;
-    uint8_t usb_status;
-    float prev_pitch = 0, prev_yaw = 0;
+    float prev_pitch = 0, prev_yaw = 0;  
     float curr_pitch, curr_yaw;
 
   /* Infinite loop */
@@ -197,46 +208,49 @@ void StartReadIMU(void *argument)
     if (received_flag == 1) {
       received_flag = 0;
       if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
-        // TIM1->CCR1 = 100;
+        TIM1->CCR1 = 10000; // ARR is 10,000
         HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
         printf("valve opened\n"); }
       else if (strncmp((char*)UserRxBufferFS, "close", received_length) == 0) {
-        // TIM1->CCR1 = 0;
+        TIM1->CCR1 = 0;
         HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
         printf("valve closed\n");
       }
     }
         
     // This task is the highest priority task
+    // Read IMU
     accel_burst_read(&accel_data);
     gyro_burst_read(&gyro_data); 
-    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
-    // printf("accel_pitch: %.2f| accel_yaw: %.2f\n", accel_pitch, accel_yaw);
 
+    // Estimate euler angles
+    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
     curr_pitch = comp_filter(0.6, 0.1, prev_pitch, -gyro_data.rate_z, accel_pitch);
     curr_yaw = comp_filter(0.6, 0.1, prev_yaw, -gyro_data.rate_y, accel_yaw); // could be gyro z?
     prev_pitch = curr_pitch; 
     prev_yaw = curr_yaw;
-    msg.timestamp = xTaskGetTickCount(); // uint32? 
-    printf("%.lu,%.2f,%.2f\n", msg.timestamp, curr_pitch, curr_yaw);
 
-    // sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, gyro_data.rate_x, gyro_data.rate_y, gyro_data.rate_z);
-    // sprintf(usb_buf, "%lu,%.2f,%.2f\n", msg.timestamp, curr_pitch, curr_yaw);
-    // printf("%lu,%.2f,%.2f\n", msg.timestamp, accel_pitch, accel_yaw);
+    // Write to shared struct safely to pass to PID controller and to log
+    osMutexAcquire(AttitudeMutexHandle, osWaitForever);
+    // attitude.est_pitch = curr_pitch;
+    // attitude.est_yaw = curr_yaw;
 
-    msg.acc_x = accel_data.acc_x + 5;
-    msg.acc_y = accel_data.acc_y + 35;
-    msg.acc_z = accel_data.acc_z+ 28;
-    // printf("%lu,%.2f,%.2f,%.2f\n", msg.timestamp, msg.acc_x, msg.acc_y, msg.acc_z);
+    full_data.rate_x = gyro_data.rate_x;
+    full_data.rate_y = gyro_data.rate_y;
+    full_data.rate_z = gyro_data.rate_z;
+    full_data.acc_x = accel_data.acc_x;
+    full_data.acc_y = accel_data.acc_y;
+    full_data.acc_z = accel_data.acc_z;
+    full_data.pitch_accel = accel_pitch;
+    full_data.yaw_accel = accel_yaw;
+    full_data.pitch = curr_pitch;
+    full_data.yaw = curr_yaw;
+    osMutexRelease(AttitudeMutexHandle);
 
     // sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, msg.acc_x, msg.acc_y, msg.acc_z);
-    // sprintf(usb_buf, "Time: %lums | acc_x:%.2f | acc_y:%.2f | acc_z:%.2f\n", msg.timestamp, accel_data.acc_x, accel_data.acc_y, accel_data.acc_z);
-    // if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
-    //   usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf));
-    // }
-    // osMessageQueuePut(messageQueueHandle, &msg, 0, 0);
 
-    osDelay(100); // 10Hz
+
+    osDelay(10); // 100Hz
     // hlw = uxTaskGetStackHighWaterMark(logHandle);
     // printf("%" PRIu32 "\r\n", hlw);
   }
@@ -253,31 +267,70 @@ void StartReadIMU(void *argument)
 void StartLog(void *argument)
 {
   /* USER CODE BEGIN StartLog */
-  // MessageQueue_t buffer[12];
-  // SD_Card_init();
-  // uint32_t hlw;
+  /* init code for USB_Device */
+  MX_USB_Device_Init();
+  SD_Card_init();
+  pid_init(&pid_pitch);
+  pid_init(&pid_yaw);
 
+  char rfd_buf[100];
+  // char rx_buf[50];
+  uint8_t usb_status;
+  float pitch_duty;
+  float yaw_duty;
+  // uint32_t hlw;
   // /* Infinite loop */
   for(;;)
   {
-  //   // 0 timeout means will return immediately - I want this because I want to maintain the 1Hz
-  //   // There are 12 elements in buffer, so there should always be 10 in there anyways since I'm reading at 10Hz
-  //   uint8_t count = 0;
-  //   // This ensures that the program doesnt interrup the usb tranmsit and get stuck waiting for queue to filled up
-  //   while (count < 10 && osMessageQueueGet(messageQueueHandle, &buffer[count], NULL, osWaitForever) == osOK) {
-  //       count++;
-  //       HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
-  //       osDelay(1);
-  //       HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port,  BLUE_LED_Pin);
-  //       osDelay(1);
+    // Pass in attitude struct atomically
+    osMutexAcquire(AttitudeMutexHandle, osWaitForever);
+    pitch_duty = pid_update(&pid_pitch, 0, full_data.pitch, 0.1);
+    yaw_duty = pid_update(&pid_yaw, 0,  full_data.yaw, 0.1);
+    full_data.pitch_error = pid_pitch.error;
+    full_data.yaw_error = pid_yaw.error;
+    full_data.pitch_duty = pitch_duty;
+    full_data.yaw_duty = yaw_duty;
 
-  //   }
-  //   // semaphore here?
-  //   log_accel(count, buffer, osThreadGetId());
-    // post semaphore, this is so 
+    // Try send over RFD
+    sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+        xTaskGetTickCount(),
+        full_data.rate_x, full_data.rate_y, full_data.rate_z,
+        full_data.acc_x, full_data.acc_y, full_data.acc_z,
+        full_data.pitch_accel, full_data.yaw_accel,
+        full_data.pitch, full_data.yaw,
+        full_data.pitch_error, full_data.yaw_error,
+        full_data.pitch_duty, full_data.yaw_duty
+      );
+
+    // blocking?
+    HAL_UART_Transmit(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf), 100);
+    if (rx_flag) {
+      HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
+      HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+      rx_flag = 0;
+    }
+    // if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
+    //   // usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf)); // OR
+    //   printf("%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+    //     xTaskGetTickCount(),
+    //     full_data.rate_x, full_data.rate_y, full_data.rate_z,
+    //     full_data.acc_x, full_data.acc_y, full_data.acc_z,
+    //     full_data.pitch_accel, full_data.yaw_accel,
+    //     full_data.pitch, full_data.yaw,
+    //     full_data.pitch_error, full_data.yaw_error,
+    //     full_data.pitch_duty, full_data.yaw_duty
+    //   ); // Modify
+    // }
+    osMutexRelease(AttitudeMutexHandle);
+
+    select_thruster(pid_pitch.error, pitch_duty, pid_yaw.error, yaw_duty, 0.1);
+
+    // semaphore here?
+    // log_accel(count, buffer, osThreadGetId());
+    // post semaphore
     // hlw = uxTaskGetStackHighWaterMark(readIMUHandle);
     // printf("hlw: %" PRIu32 "\r\n", hlw);
-    osDelay(1000); // 1Hz, every second
+    osDelay(100); // 10Hz, every 100ms
   }
   /* USER CODE END StartLog */
 }
