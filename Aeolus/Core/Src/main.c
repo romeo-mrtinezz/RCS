@@ -23,7 +23,6 @@
 #include "dma.h"
 #include "app_fatfs.h"
 #include "spi.h"
-#include "stm32g4xx_hal_adc.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -193,7 +192,7 @@ int main(void)
   HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
   /* USER CODE END 2 */
 
-  // /* Init scheduler */
+  /* Init scheduler */
   // osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
   // MX_FREERTOS_Init();
 
