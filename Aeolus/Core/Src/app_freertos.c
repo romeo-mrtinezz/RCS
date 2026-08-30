@@ -18,11 +18,13 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
-#include "FreeRTOS.h"
-#include "task.h"
 #include "main.h"
+#include "FreeRTOS.h"
+#include "stm32g4xx_hal_uart.h"
+#include "task.h"
 #include "cmsis_os.h"
 
+#include "usart.h"
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -32,11 +34,13 @@
 #include "sd.h"
 #include "global.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
 #include "usbd_def.h"
 #include <inttypes.h>
+#include <sys/_intsup.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +50,8 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 extern uint8_t received_flag;
 extern uint32_t received_length;
+extern volatile uint8_t rx_flag;
+extern char rx_buf[20];
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -267,7 +273,8 @@ void StartLog(void *argument)
   pid_init(&pid_pitch);
   pid_init(&pid_yaw);
 
-  char usb_buf[100];
+  char rfd_buf[100];
+  // char rx_buf[50];
   uint8_t usb_status;
   float pitch_duty;
   float yaw_duty;
@@ -284,9 +291,8 @@ void StartLog(void *argument)
     full_data.pitch_duty = pitch_duty;
     full_data.yaw_duty = yaw_duty;
 
-    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
-      // usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf)); // OR
-      printf("%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+    // Try send over RFD
+    sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
         xTaskGetTickCount(),
         full_data.rate_x, full_data.rate_y, full_data.rate_z,
         full_data.acc_x, full_data.acc_y, full_data.acc_z,
@@ -294,8 +300,27 @@ void StartLog(void *argument)
         full_data.pitch, full_data.yaw,
         full_data.pitch_error, full_data.yaw_error,
         full_data.pitch_duty, full_data.yaw_duty
-      ); // Modify
+      );
+
+    // blocking?
+    HAL_UART_Transmit(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf), 100);
+    if (rx_flag) {
+      HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
+      HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+      rx_flag = 0;
     }
+    // if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
+    //   // usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf)); // OR
+    //   printf("%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+    //     xTaskGetTickCount(),
+    //     full_data.rate_x, full_data.rate_y, full_data.rate_z,
+    //     full_data.acc_x, full_data.acc_y, full_data.acc_z,
+    //     full_data.pitch_accel, full_data.yaw_accel,
+    //     full_data.pitch, full_data.yaw,
+    //     full_data.pitch_error, full_data.yaw_error,
+    //     full_data.pitch_duty, full_data.yaw_duty
+    //   ); // Modify
+    // }
     osMutexRelease(AttitudeMutexHandle);
 
     select_thruster(pid_pitch.error, pitch_duty, pid_yaw.error, yaw_duty, 0.1);

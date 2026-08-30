@@ -20,8 +20,10 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "adc.h"
+#include "dma.h"
 #include "app_fatfs.h"
 #include "spi.h"
+#include "stm32g4xx_hal_uart.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -46,6 +48,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <math.h>
+#include <sys/_intsup.h>
 
 /* USER CODE END Includes */
 
@@ -72,6 +75,8 @@ FullData full_data;
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+volatile uint8_t rx_flag = 0;
+char rx_buf[20];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -104,12 +109,16 @@ void pwm_logic(float acc_y) {
 
 }
 
-int _write(int file, char *ptr, int len) {
-  while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
-    HAL_Delay(1);
-  }
+// int _write(int file, char *ptr, int len) {
+//   while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
+//     HAL_Delay(1);
+//   }
 
-  return(len);
+//   return(len);
+// }
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+  HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+  rx_flag = 1;
 }
 /* USER CODE END PFP */
 
@@ -145,6 +154,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI1_Init();
   MX_SPI2_Init();
   MX_TIM1_Init();
@@ -169,17 +179,18 @@ int main(void)
   TIM1->CCR1 = 0; // 5000 is 50% duty cycle for ARR = 10,000
   TIM1->CCR2 = 0;
 
-  
   char msg[50] = "Hey";
   HAL_StatusTypeDef status;
+  
+  HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
   /* USER CODE END 2 */
 
   /* Init scheduler */
-  // osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
-  // MX_FREERTOS_Init();
+  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
 
   /* Start scheduler */
-  // osKernelStart();
+  osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
@@ -187,9 +198,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    status = HAL_UART_Transmit(&huart4, (uint8_t *)msg, strlen(msg), 100);  
-    HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);  
-    HAL_Delay(1000);
+    // status = HAL_UART_Transmit(&huart4, (uint8_t *)msg, strlen(msg), 100);  
+    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);  
+    // HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
