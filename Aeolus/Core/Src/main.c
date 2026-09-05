@@ -23,6 +23,7 @@
 #include "dma.h"
 #include "app_fatfs.h"
 #include "spi.h"
+#include "stm32g4xx_hal_uart.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -48,6 +49,8 @@
 #include <string.h>
 #include <math.h>
 #include <sys/_intsup.h>
+#include "usbd_cdc_if.h"
+
 
 /* USER CODE END Includes */
 
@@ -64,6 +67,11 @@ PID_params pid_pitch;
 PID_params pid_yaw;
 Attitude attitude;
 FullData full_data;
+extern uint8_t received_flag;
+extern uint32_t received_length;
+extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
+
+
 
 /* USER CODE END PD */
 
@@ -77,6 +85,10 @@ FullData full_data;
 volatile uint8_t rx_flag = 0;
 char rx_buf[20];
 volatile uint8_t adc_flag = 0;
+volatile uint8_t rx_load_cell = 0;
+char load_cell_dma_buf[20];
+char load_cell_usb_buf[20];
+volatile uint8_t load_cell_ready;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,17 +121,33 @@ void pwm_logic(float acc_y) {
 
 }
 
-// int _write(int file, char *ptr, int len) {
-//   while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
-//     HAL_Delay(1);
-//   }
+int _write(int file, char *ptr, int len) {
+  while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
+    HAL_Delay(1);
+  }
 
-//   return(len);
-// }
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-  HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
-  rx_flag = 1;
+  return(len);
 }
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+  // RFD
+  if (huart->Instance == UART4) {
+    HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+    rx_flag = 1;
+  }
+  // Load cell
+  else if (huart->Instance == UART5) {
+    memcpy(load_cell_usb_buf, load_cell_dma_buf, 14);
+    load_cell_ready = 1;
+    HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 14);
+    HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+  }
+}
+
+// void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+//   if (huart->Instance == UART5) {
+//     HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+//   }
+// }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
   adc_flag = 1;
@@ -171,7 +199,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  // MX_USB_Device_Init(); // <-------------------------------------------------
+  MX_USB_Device_Init(); // <-------------------------------------------------
 
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
@@ -186,10 +214,15 @@ int main(void)
   char msg[50] = "Hey";
   HAL_StatusTypeDef status;
   volatile uint16_t adc_val[2];
-  uint16_t high_pressure;
-  uint16_t low_pressure;
+  float high_pressure;
+  float low_pressure;
+  float high_pt_v;
+  float low_pt_v;
+  char pt_buf[50];
   
+  // Need to iniatite once so that callback function will be called
   HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
+  HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 14);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -205,16 +238,53 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
-    HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
-    high_pressure = adc_val[0];
-    low_pressure = adc_val[1];
-    if (adc_flag) {
-      HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
-      adc_flag = 0;
+    // HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
+    // high_pt_v = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[0];
+    // low_pt_v = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[1];
+    // high_pressure = (high_pt_v - 0.5f)*50.0f + 3.6f;
+    // low_pressure = (low_pt_v - 0.5f)*50.0f + 3.6f;
+    // if (adc_flag) {
+    //   // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+    //   adc_flag = 0;
+    //   sprintf(pt_buf, "HP = %.2f | LP = %.2f\r\n", (float)high_pressure, (float)low_pressure);
+    //   CDC_Transmit_FS((uint8_t *)pt_buf, strlen(pt_buf));
+    // }
+    if (received_flag == 1) { // USB
+      received_flag = 0;
+      if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
+        TIM1->CCR1 = 10000; // ARR is 10,000
+        HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+        printf("valve opened\n"); }
+      else if (strncmp((char*)UserRxBufferFS, "close", received_length) == 0) {
+        TIM1->CCR1 = 0;
+        HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+        printf("valve closed\n");
+      }
     }
-    HAL_Delay(1000);
+    // if (rx_load_cell) {
+      // weight format B,<stx> <status> <sign> <weightA(7)> <Units(3)> <etx>
+      //                 1char, 1 char, 1 char, 7 char,    3 char,     1 char, so expected rx is 14
+      // Being auto transmitted from load cell at 10Hz
+
+      // Send to laptop over usb
+      // CDC_Transmit_FS((uint8_t *)load_cell_dma_buf, 14);
+
+      // Restar transfer from load cell
+      // HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 14);
+      // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+      // rx_load_cell = 0;
+    // }
+
+    if (load_cell_ready) {
+      load_cell_ready = 0;
+      load_cell_usb_buf[14] = '\r';
+      load_cell_usb_buf[15] = '\n';
+      CDC_Transmit_FS((uint8_t *)load_cell_usb_buf, 16);
+    }
+
+    HAL_Delay(100);
     // status = HAL_UART_Transmit(&huart4, (uint8_t *)msg, strlen(msg), 100);  
-    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);  
+    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
     // HAL_Delay(1000);
     /* USER CODE END WHILE */
 
