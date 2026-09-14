@@ -136,9 +136,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   }
   // Load cell
   else if (huart->Instance == UART5) {
-    memcpy(load_cell_usb_buf, load_cell_dma_buf, 14);
+    memcpy(load_cell_usb_buf, load_cell_dma_buf, 11);
     load_cell_ready = 1;
-    HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 14);
+    HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 11);
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
 }
@@ -222,7 +222,7 @@ int main(void)
   float low_pt_v;
   char pt_buf[50];
 
-  float supply_voltage = 4.84; // 11.74V battery, configurable
+  float supply_voltage = 4.84; // 11.74V battery, configurable CHANGE TO 4.97 for USB
   float zero_voltage = 0.1*supply_voltage;
   float full_scale_voltage = 0.9*supply_voltage;
   float voltage_span = full_scale_voltage-zero_voltage;
@@ -231,7 +231,7 @@ int main(void)
   
   // Need to iniatite once so that callback function will be called
   HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
-  HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 14);
+  HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 11);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -259,10 +259,6 @@ int main(void)
     // high_pressure = (high_pt_v - 0.5f)*50.0f + 3.6f; <------- this assumed that we were getting perfect 5V
     // low_pressure  = (low_pt_v  - 0.5f)*50.0f + 3.6f;
 
-    // weight format B,<stx> <status> <sign> <weightA(7)> <Units(3)> <etx>
-    //                 1char, 1 char, 1 char, 7 char,    3 char,     1 char, so expected rx is 14
-    // Being auto transmitted from load cell at 10Hz
-
     // Send to laptop over usb
     // CDC_Transmit_FS((uint8_t *)load_cell_dma_buf, 14);
 
@@ -271,9 +267,12 @@ int main(void)
     // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
     // rx_load_cell = 0;
 
+    // weight format A, <stx> <sign> <weightA(7)> <status> <etx>
+    //                 1 char, 1 char, 7 char,     1 char, 1 char  = 11 bytes
+
     if (load_cell_ready) {
       load_cell_ready = 0;
-      snprintf(load_cell_usb_buf, 15, "%.14s", load_cell_dma_buf);
+      snprintf(load_cell_usb_buf, 12, "%.11s", load_cell_dma_buf);
     }
 
     if (received_flag == 1) { // USB
@@ -293,7 +292,7 @@ int main(void)
       HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
       adc_flag = 0;
       duration = HAL_GetTick() - start;
-      snprintf(pt_buf, 40, "%.2f,%.2f,%.14s\n", high_pressure, low_pressure, load_cell_usb_buf);
+      snprintf(pt_buf, 40, "%.2f,%.2f,%.11s\n", high_pressure, low_pressure, load_cell_usb_buf);
       CDC_Transmit_FS((uint8_t *)pt_buf, strlen(pt_buf));
     }
 
