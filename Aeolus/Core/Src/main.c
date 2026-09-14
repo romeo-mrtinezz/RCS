@@ -220,7 +220,7 @@ int main(void)
   float low_pressure;
   float high_pt_v;
   float low_pt_v;
-  char pt_buf[50];
+  char pt_buf[70];
 
   float supply_voltage = 4.84; // 11.74V battery, configurable CHANGE TO 4.97 for USB
   float zero_voltage = 0.1*supply_voltage;
@@ -288,15 +288,15 @@ int main(void)
       }
     }
 
-    if (adc_flag) {
+    if (adc_flag) { // PT
       HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
       adc_flag = 0;
       duration = HAL_GetTick() - start;
-      snprintf(pt_buf, 40, "%.2f,%.2f,%.11s\n", high_pressure, low_pressure, load_cell_usb_buf);
+      snprintf(pt_buf, 60, "%lu,%.2f,%.2f,%.11s\n", duration, high_pressure, low_pressure, load_cell_usb_buf);
       CDC_Transmit_FS((uint8_t *)pt_buf, strlen(pt_buf));
     }
 
-    HAL_Delay(100);
+    HAL_Delay(50); // just under 60Hz
   }
   /* USER CODE END 3 */
 }
