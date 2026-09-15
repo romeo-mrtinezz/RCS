@@ -19,6 +19,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
+#include "adc.h"
+#include "cmsis_os2.h"
+#include "stm32g4xx_hal_adc.h"
+#include "stm32g4xx_hal_uart.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -45,12 +49,19 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 extern USBD_HandleTypeDef hUsbDeviceFS;
+extern ADC_HandleTypeDef hadc2;
 
 extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 extern uint8_t received_flag;
 extern uint32_t received_length;
 extern volatile uint8_t rx_flag;
 extern char rx_buf[20];
+extern char load_cell_dma_buf[20];
+extern char load_cell_usb_buf[40];
+extern volatile uint8_t load_cell_ready;
+extern volatile uint8_t adc_flag;
+extern volatile uint8_t rx_load_cell;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -193,69 +204,67 @@ void MX_FREERTOS_Init(void) {
 void StartReadIMU(void *argument)
 {
   /* init code for USB_Device */
-  MX_USB_Device_Init();
   /* USER CODE BEGIN StartReadIMU */
-    float accel_pitch, accel_yaw;
-    // uint32_t hlw;
-    // osStatus_t os_status;
-    float prev_pitch = 0, prev_yaw = 0;  
-    float curr_pitch, curr_yaw;
+  volatile uint16_t adc_val[2];
+  float high_pressure;
+  float low_pressure;
+  float high_pt_v;
+  float low_pt_v;
+  char pt_buf[100];
 
+  float supply_voltage = 4.97; // 11.74V battery, configurable CHANGE TO 4.97 for USB, 4.84 for battery only
+  float zero_voltage = 0.1*supply_voltage;
+  float full_scale_voltage = 0.9*supply_voltage;
+  float voltage_span = full_scale_voltage-zero_voltage;
+  float pressure_span = 200; // 0-200 bar PT
+  float pressure_offset1 = 3.8; // Constant offset if needed
+  float pressure_offset2 = 3.8;
   /* Infinite loop */
+  uint32_t start = xTaskGetTickCount();
+  uint32_t duration;
   for(;;)
   {
-    if (received_flag == 1) {
+    HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
+    high_pt_v = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[0];
+    low_pt_v  = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[1];
+    high_pressure = (high_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset1;
+    low_pressure = (low_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset2;
+    // high_pressure = (high_pt_v - 0.5f)*50.0f + 3.6f; <------- this assumed that we were getting perfect 5V
+    // low_pressure  = (low_pt_v  - 0.5f)*50.0f + 3.6f;
+
+    if (load_cell_ready) {
+      load_cell_ready = 0;
+      snprintf(load_cell_usb_buf, 12, "%.11s", load_cell_dma_buf);
+    }
+
+    if (received_flag == 1) { // USB
       received_flag = 0;
       if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
         TIM1->CCR1 = 10000; // ARR is 10,000
-        HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+        // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
         printf("valve opened\n"); }
       else if (strncmp((char*)UserRxBufferFS, "close", received_length) == 0) {
         TIM1->CCR1 = 0;
-        HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+        // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
         printf("valve closed\n");
       }
     }
-        
-    // This task is the highest priority task
-    // Read IMU
-    accel_burst_read(&accel_data);
-    gyro_burst_read(&gyro_data); 
 
-    // Estimate euler angles
-    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
-    curr_pitch = comp_filter(0.6, 0.1, prev_pitch, -gyro_data.rate_z, accel_pitch);
-    curr_yaw = comp_filter(0.6, 0.1, prev_yaw, -gyro_data.rate_y, accel_yaw); // could be gyro z?
-    prev_pitch = curr_pitch; 
-    prev_yaw = curr_yaw;
+    if (adc_flag) { // PT
+      HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+      adc_flag = 0;
+      duration = xTaskGetTickCount() - start;
+      snprintf(pt_buf, 100, "%lu,%.2f,%.2f,%.11s\n", duration, high_pressure, low_pressure, load_cell_usb_buf);
+      // if above truncates text, most likely buffer overflow because duration gets to a 6 digit string
 
-    // Write to shared struct safely to pass to PID controller and to log
-    osMutexAcquire(AttitudeMutexHandle, osWaitForever);
-    // attitude.est_pitch = curr_pitch;
-    // attitude.est_yaw = curr_yaw;
-
-    full_data.rate_x = gyro_data.rate_x;
-    full_data.rate_y = gyro_data.rate_y;
-    full_data.rate_z = gyro_data.rate_z;
-    full_data.acc_x = accel_data.acc_x;
-    full_data.acc_y = accel_data.acc_y;
-    full_data.acc_z = accel_data.acc_z;
-    full_data.pitch_accel = accel_pitch;
-    full_data.yaw_accel = accel_yaw;
-    full_data.pitch = curr_pitch;
-    full_data.yaw = curr_yaw;
-    osMutexRelease(AttitudeMutexHandle);
-
-    // sprintf(usb_buf, "%lu,%.2f,%.2f,%.2f\n", msg.timestamp, msg.acc_x, msg.acc_y, msg.acc_z);
-
-
-    osDelay(10); // 100Hz
-    // hlw = uxTaskGetStackHighWaterMark(logHandle);
-    // printf("%" PRIu32 "\r\n", hlw);
-  }
+      CDC_Transmit_FS((uint8_t *)pt_buf, strlen(pt_buf));
+      // HAL_UART_Transmit(&huart4, (uint8_t *)pt_buf, strlen(pt_buf), 50);
+    }
+     
+    osDelay(17);
   /* USER CODE END StartReadIMU */
+  }
 }
-
 /* USER CODE BEGIN Header_StartLog */
 /**
 * @brief Function implementing the log thread.
@@ -266,70 +275,11 @@ void StartReadIMU(void *argument)
 void StartLog(void *argument)
 {
   /* USER CODE BEGIN StartLog */
-  /* init code for USB_Device */
-  MX_USB_Device_Init();
-  SD_Card_init();
-  pid_init(&pid_pitch);
-  pid_init(&pid_yaw);
-
-  char rfd_buf[100];
-  // char rx_buf[50];
-  uint8_t usb_status;
-  float pitch_duty;
-  float yaw_duty;
-  // uint32_t hlw;
+  /* init code for USB_Device */  
   // /* Infinite loop */
   for(;;)
   {
-    // Pass in attitude struct atomically
-    osMutexAcquire(AttitudeMutexHandle, osWaitForever);
-    pitch_duty = pid_update(&pid_pitch, 0, full_data.pitch, 0.1);
-    yaw_duty = pid_update(&pid_yaw, 0,  full_data.yaw, 0.1);
-    full_data.pitch_error = pid_pitch.error;
-    full_data.yaw_error = pid_yaw.error;
-    full_data.pitch_duty = pitch_duty;
-    full_data.yaw_duty = yaw_duty;
-
-    // Try send over RFD
-    sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
-        xTaskGetTickCount(),
-        full_data.rate_x, full_data.rate_y, full_data.rate_z,
-        full_data.acc_x, full_data.acc_y, full_data.acc_z,
-        full_data.pitch_accel, full_data.yaw_accel,
-        full_data.pitch, full_data.yaw,
-        full_data.pitch_error, full_data.yaw_error,
-        full_data.pitch_duty, full_data.yaw_duty
-      );
-
-    // blocking?
-    HAL_UART_Transmit(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf), 100);
-    if (rx_flag) {
-      HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
-      HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
-      rx_flag = 0;
-    }
-    // if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) {
-    //   // usb_status = CDC_Transmit_FS((uint8_t *)usb_buf, strlen(usb_buf)); // OR
-    //   printf("%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
-    //     xTaskGetTickCount(),
-    //     full_data.rate_x, full_data.rate_y, full_data.rate_z,
-    //     full_data.acc_x, full_data.acc_y, full_data.acc_z,
-    //     full_data.pitch_accel, full_data.yaw_accel,
-    //     full_data.pitch, full_data.yaw,
-    //     full_data.pitch_error, full_data.yaw_error,
-    //     full_data.pitch_duty, full_data.yaw_duty
-    //   ); // Modify
-    // }
-    osMutexRelease(AttitudeMutexHandle);
-
-    select_thruster(pid_pitch.error, pitch_duty, pid_yaw.error, yaw_duty, 0.1);
-
-    // semaphore here?
-    // log_accel(count, buffer, osThreadGetId());
-    // post semaphore
-    // hlw = uxTaskGetStackHighWaterMark(readIMUHandle);
-    // printf("hlw: %" PRIu32 "\r\n", hlw);
-    osDelay(100); // 10Hz, every 100ms
+    osDelay(10000); // 10Hz, every 100ms
   }
   /* USER CODE END StartLog */
 }

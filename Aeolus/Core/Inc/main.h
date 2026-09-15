@@ -52,6 +52,8 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc);
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
