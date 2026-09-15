@@ -239,10 +239,82 @@ void StartReadIMU(void *argument)
 
     if (received_flag == 1) { // USB
       received_flag = 0;
-      if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
-        TIM1->CCR1 = 10000; // ARR is 10,000
+      if(strncmp((char*)UserRxBufferFS, "100", received_length) == 0) {
+        TIM1->CCR1 = 10000; // ARR is 10,000, currently PWM freq is 10Hz
         // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
-        printf("valve opened\n"); }
+        // EDIT HERE FOR MAPPING LOGIC-------------------------------------------------
+        printf("valve opened\n"); 
+        osDelay(100); // ms
+        TIM1->CCR1 = 0;
+        printf("valve closed\n");
+      }
+      else if (strncmp((char*)UserRxBufferFS, "90", received_length) == 0) {
+        TIM1->CCR1 = 9000;
+        printf("valve open\n");
+        osDelay(100); // ms
+        TIM1->CCR1 = 0;
+        printf("valve closed\n");
+      }
+      else if (strncmp((char*)UserRxBufferFS, "80", received_length) == 0) {
+        TIM1->CCR1 = 8000;
+        printf("valve open\n");
+        osDelay(100); // ms
+        TIM1->CCR1 = 0;
+        printf("valve closed\n");
+      }
+      else if (strncmp((char*)UserRxBufferFS, "70", received_length) == 0) {
+        TIM1->CCR1 = 7000;
+        printf("valve open\n");
+        osDelay(100); // ms
+        TIM1->CCR1 = 0;
+        printf("valve closed\n");
+      }
+      else if (strncmp((char*)UserRxBufferFS, "60", received_length) == 0) {
+        TIM1->CCR1 = 6000;
+        printf("valve open\n");
+        osDelay(100); // ms
+        TIM1->CCR1 = 0;
+        printf("valve closed\n");
+      }
+      else if (strncmp((char*)UserRxBufferFS, "50", received_length) == 0) {
+        TIM1->CCR1 = 5000; // why didnt this work 
+        printf("valve open\n");
+        // osDelay(500); // ms 5 cycles
+        // TIM1->CCR1 = 0;
+        printf("valve closed\n");
+      }
+      else if (strncmp((char*)UserRxBufferFS, "40", received_length) == 0) {
+        TIM1->CCR1 = 4000;
+        printf("valve open\n");
+        osDelay(100); // ms
+        TIM1->CCR1 = 0;
+        printf("valve closed\n");
+      }
+      else if (strncmp((char*)UserRxBufferFS, "30", received_length) == 0) {
+        TIM1->CCR1 = 3000;
+        printf("valve open\n");
+        osDelay(100); // ms
+        TIM1->CCR1 = 0;
+        printf("valve closed\n");
+      }
+      else if (strncmp((char*)UserRxBufferFS, "20", received_length) == 0) {
+        TIM1->CCR1 = 2000;
+        printf("valve open\n");
+        osDelay(100); // ms
+        TIM1->CCR1 = 0;
+        printf("valve closed\n");
+      }
+      else if (strncmp((char*)UserRxBufferFS, "10", received_length) == 0) {
+        TIM1->CCR1 = 1000;
+        printf("valve open\n");
+        osDelay(100); // ms
+        TIM1->CCR1 = 0;
+        printf("valve closed\n");
+      }
+      else if (strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
+        TIM1->CCR1 = 10000;
+        printf("valve open\n");
+      }
       else if (strncmp((char*)UserRxBufferFS, "close", received_length) == 0) {
         TIM1->CCR1 = 0;
         // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
