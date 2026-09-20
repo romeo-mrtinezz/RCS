@@ -33,7 +33,7 @@ typedef struct {
 
 /*
     Data to stream, max data rate of RFD900ux is 224kbps.
-    Total below is 480bits I believe. * 10Hz that's 4.8kbps, so plenty of margin
+    Total below is 480bits I believe. * 10Hz that's 4.8kbps, so plenty of margin (before pressure)
 */
 typedef struct {
     uint32_t timestamp; // ms
@@ -52,6 +52,9 @@ typedef struct {
     float yaw_error;
     float pitch_duty;
     float yaw_duty; 
+
+    float high_pressure;
+    float low_pressure;
 } FullData;
 
 typedef struct {

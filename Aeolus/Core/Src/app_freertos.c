@@ -19,10 +19,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
-#include "adc.h"
-#include "cmsis_os2.h"
-#include "stm32g4xx_hal_adc.h"
-#include "stm32g4xx_hal_uart.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -83,24 +79,40 @@ extern FullData full_data;
 /* USER CODE BEGIN Variables */
 
 /* USER CODE END Variables */
-/* Definitions for readIMU */
-osThreadId_t readIMUHandle;
-const osThreadAttr_t readIMU_attributes = {
-  .name = "readIMU",
+/* Definitions for defaultTask */
+osThreadId_t defaultTaskHandle;
+const osThreadAttr_t defaultTask_attributes = {
+  .name = "defaultTask",
   .priority = (osPriority_t) osPriorityHigh,
-  .stack_size = 2500 * 4
+  .stack_size = 200 * 4
+};
+/* Definitions for controlLoop */
+osThreadId_t controlLoopHandle;
+const osThreadAttr_t controlLoop_attributes = {
+  .name = "controlLoop",
+  .priority = (osPriority_t) osPriorityHigh7,
+  .stack_size = 2000 * 4
+};
+/* Definitions for readImu */
+osThreadId_t readImuHandle;
+const osThreadAttr_t readImu_attributes = {
+  .name = "readImu",
+  .priority = (osPriority_t) osPriorityHigh6,
+  .stack_size = 2000 * 4
+};
+/* Definitions for stream */
+osThreadId_t streamHandle;
+const osThreadAttr_t stream_attributes = {
+  .name = "stream",
+  .priority = (osPriority_t) osPriorityNormal4,
+  .stack_size = 2000 * 4
 };
 /* Definitions for log */
 osThreadId_t logHandle;
 const osThreadAttr_t log_attributes = {
   .name = "log",
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityNormal5,
   .stack_size = 2000 * 4
-};
-/* Definitions for messageQueue */
-osMessageQueueId_t messageQueueHandle;
-const osMessageQueueAttr_t messageQueue_attributes = {
-  .name = "messageQueue"
 };
 /* Definitions for AttitudeMutex */
 osMutexId_t AttitudeMutexHandle;
@@ -118,7 +130,10 @@ const osSemaphoreAttr_t testSemaphore_attributes = {
 
 /* USER CODE END FunctionPrototypes */
 
+void StartDefaultTask(void *argument);
+void StartControlLoop(void *argument);
 void StartReadIMU(void *argument);
+void StartStream(void *argument);
 void StartLog(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -168,18 +183,23 @@ void MX_FREERTOS_Init(void) {
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
-  /* Create the queue(s) */
-  /* creation of messageQueue */
-  messageQueueHandle = osMessageQueueNew (12, sizeof(uint16_t), &messageQueue_attributes);
-
   /* USER CODE BEGIN RTOS_QUEUES */
 
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of readIMU */
-  readIMUHandle = osThreadNew(StartReadIMU, NULL, &readIMU_attributes);
+  /* creation of defaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of controlLoop */
+  controlLoopHandle = osThreadNew(StartControlLoop, NULL, &controlLoop_attributes);
+
+  /* creation of readImu */
+  readImuHandle = osThreadNew(StartReadIMU, NULL, &readImu_attributes);
+
+  /* creation of stream */
+  streamHandle = osThreadNew(StartStream, NULL, &stream_attributes);
 
   /* creation of log */
   logHandle = osThreadNew(StartLog, NULL, &log_attributes);
@@ -194,6 +214,44 @@ void MX_FREERTOS_Init(void) {
 
 }
 
+/* USER CODE BEGIN Header_StartDefaultTask */
+/**
+  * @brief  Function implementing the defaultTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void *argument)
+{
+  /* init code for USB_Device */
+  MX_USB_Device_Init();
+  /* USER CODE BEGIN StartDefaultTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartDefaultTask */
+}
+
+/* USER CODE BEGIN Header_StartControlLoop */
+/**
+* @brief Function implementing the controlLoop thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartControlLoop */
+void StartControlLoop(void *argument)
+{
+  /* USER CODE BEGIN StartControlLoop */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartControlLoop */
+}
+
 /* USER CODE BEGIN Header_StartReadIMU */
 /**
   * @brief  Function implementing the readIMU thread.
@@ -203,7 +261,6 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_StartReadIMU */
 void StartReadIMU(void *argument)
 {
-  /* init code for USB_Device */
   /* USER CODE BEGIN StartReadIMU */
   volatile uint16_t adc_val[2];
   float high_pressure;
@@ -270,6 +327,25 @@ void StartReadIMU(void *argument)
   /* USER CODE END StartReadIMU */
   }
 }
+
+/* USER CODE BEGIN Header_StartStream */
+/**
+* @brief Function implementing the stream thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartStream */
+void StartStream(void *argument)
+{
+  /* USER CODE BEGIN StartStream */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartStream */
+}
+
 /* USER CODE BEGIN Header_StartLog */
 /**
 * @brief Function implementing the log thread.
@@ -280,11 +356,10 @@ void StartReadIMU(void *argument)
 void StartLog(void *argument)
 {
   /* USER CODE BEGIN StartLog */
-  /* init code for USB_Device */  
-  // /* Infinite loop */
+  /* Infinite loop */
   for(;;)
   {
-    osDelay(10000); // 5Hz, every 200ms
+    osDelay(1);
   }
   /* USER CODE END StartLog */
 }

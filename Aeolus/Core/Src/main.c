@@ -23,7 +23,6 @@
 #include "dma.h"
 #include "app_fatfs.h"
 #include "spi.h"
-#include "stm32g4xx_hal_uart.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -145,11 +144,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   }
 }
 
-// void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
-//   if (huart->Instance == UART5) {
-//     HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
-//   }
-// }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
   adc_flag = 1;
@@ -198,41 +192,19 @@ int main(void)
   MX_ADC2_Init();
   MX_UART4_Init();
   MX_UART5_Init();
-  MX_USART1_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  MX_USB_Device_Init(); // <-------------------------------------------------
+  // MX_USB_Device_Init(); // <-------------------------------------------------
 
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
   if (accel_init() != 30) {
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
-
-  HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, 1);
-  HAL_Delay(3000);
   // Set solenoid valves initially closed
   TIM1->CCR1 = 0; // 5000 is 50% duty cycle for ARR = 10,000
   TIM1->CCR2 = 0;
 
-  char msg[50] = "Hey";
-  HAL_StatusTypeDef status;
-
-  // PT params-----------------------------
-  // volatile uint16_t adc_val[2];
-  // float high_pressure;
-  // float low_pressure;
-  // float high_pt_v;
-  // float low_pt_v;
-  // char pt_buf[70];
-
-  // float supply_voltage = 4.84; // 11.74V battery, configurable CHANGE TO 4.97 for USB
-  // float zero_voltage = 0.1*supply_voltage;
-  // float full_scale_voltage = 0.9*supply_voltage;
-  // float voltage_span = full_scale_voltage-zero_voltage;
-  // float pressure_span = 200; // 0-200 bar PT
-  // float pressure_offset = 0; // Constant offset if needed
-  
   // Need to iniatite once so that callback function will be called
   HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
   HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 11);
@@ -250,15 +222,16 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   /* USER CODE END 3 */
-  uint32_t start = HAL_GetTick();
-  uint32_t duration;
 
   while (1)
   {
-   
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
+
 /**
   * @brief System Clock Configuration
   * @retval None
