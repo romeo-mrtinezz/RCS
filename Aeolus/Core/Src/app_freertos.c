@@ -19,6 +19,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
+#include "stm32g4xx_hal.h"
+#include "PID.h"
+#include "cmsis_os2.h"
+#include "stm32g4xx_hal_gpio.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -27,7 +31,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stm32g4xx_hal.h"
 #include "usart.h"
 #include "pid.h"
 #include "bmi088.h"
@@ -63,7 +66,6 @@ extern AccData accel_data;
 extern GyroData gyro_data;
 extern PID_params pid_pitch;
 extern PID_params pid_yaw;
-extern Attitude attitude;
 extern FullData full_data;
 
 // extern USBD_HandleTypeDef hUsbDeviceFS;
@@ -269,9 +271,21 @@ void StartDefaultTask(void *argument)
 void StartControlLoop(void *argument)
 {
   /* USER CODE BEGIN StartControlLoop */
+  float pitch_duty, yaw_duty;
   /* Infinite loop */
   for(;;)
   {
+    osMutexAcquire(AttitudeMutexHandle, osWaitForever);
+    pitch_duty = pid_update(&pid_pitch, 0, full_data.pitch, 0.2);
+    yaw_duty = pid_update(&pid_yaw, 0, full_data.yaw, 0.2);
+    HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+    full_data.pitch_error = pid_pitch.error;
+    full_data.yaw_error = pid_yaw.error;
+    full_data.pitch_duty = pitch_duty;
+    full_data.yaw_duty = yaw_duty; 
+    osMutexRelease(AttitudeMutexHandle);
+    
+    select_thruster(pid_pitch.error, pitch_duty, pid_yaw.error, yaw_duty, 0.2);
     osDelay(200); // 5 Hz, 200ms
   }
   /* USER CODE END StartControlLoop */
@@ -337,17 +351,12 @@ void StartStream(void *argument)
   /* Infinite loop */
   for(;;)
   {
-        // Pass in attitude struct atomically
+    // Pass in attitude struct atomically
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
-    pitch_duty = pid_update(&pid_pitch, 0, full_data.pitch, 0.1);
-    yaw_duty = pid_update(&pid_yaw, 0,  full_data.yaw, 0.1);
-    full_data.pitch_error = pid_pitch.error;
-    full_data.yaw_error = pid_yaw.error;
-    full_data.pitch_duty = pitch_duty;
-    full_data.yaw_duty = yaw_duty;
 
-    // Copy buffer data into buffer for rfd
-    sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+    // Send over rfd, non-blocking
+    if (rfd_tx_flag == 1) {
+      sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
         xTaskGetTickCount(),
         full_data.rate_x, full_data.rate_y, full_data.rate_z,
         full_data.acc_x, full_data.acc_y, full_data.acc_z,
@@ -356,13 +365,10 @@ void StartStream(void *argument)
         full_data.pitch_error, full_data.yaw_error,
         full_data.pitch_duty, full_data.yaw_duty
       );
-    osMutexRelease(AttitudeMutexHandle);
-
-    // Send over rfd, non-blocking
-    if (rfd_tx_flag == 1) {
       HAL_UART_Transmit_DMA(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf));
       rfd_tx_flag = 0; // ensures we only transmit after previos=us transmission completed
     }
+    osMutexRelease(AttitudeMutexHandle);
     osDelay(100); // 10Hz, 100ms
   }
   /* USER CODE END StartStream */

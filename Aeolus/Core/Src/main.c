@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "PID.h"
 #include "cmsis_os.h"
 #include "adc.h"
 #include "dma.h"
@@ -74,7 +75,6 @@ AccData accel_data;
 GyroData gyro_data;
 PID_params pid_pitch;
 PID_params pid_yaw;
-Attitude attitude;
 FullData full_data;
 
 // USB variables, from usbd_cdc_if.h-----------------------
@@ -154,7 +154,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
   rfd_tx_flag = 1;
-  HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+  // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
 };
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
@@ -207,6 +207,8 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   // MX_USB_Device_Init(); // <-------------------------------------------------
+  pid_init(&pid_pitch);
+  pid_init(&pid_yaw);
 
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
