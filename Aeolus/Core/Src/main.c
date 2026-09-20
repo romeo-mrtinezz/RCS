@@ -209,6 +209,8 @@ int main(void)
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
 
+  HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, 1);
+  HAL_Delay(3000);
   // Set solenoid valves initially closed
   TIM1->CCR1 = 0; // 5000 is 50% duty cycle for ARR = 10,000
   TIM1->CCR2 = 0;

@@ -2,6 +2,21 @@ import re
 import numpy as np
 import matplotlib.pyplot as plt
 
+def moving_average(data, window_size=10):
+    kernel = np.ones(window_size) / window_size
+
+    padded_data = np.pad(
+        data,
+        (window_size // 2, window_size - 1 - window_size // 2),
+        mode="edge"
+    )
+
+    return np.convolve(
+        padded_data,
+        kernel,
+        mode="valid"
+    )
+
 
 # ============================================================
 # SETTINGS
@@ -22,6 +37,7 @@ filename = input("Enter filename (including .txt): ")
 # ============================================================
 
 time_ms = []
+high_side_pressure = []
 low_side_pressure = []
 weight_raw_kg = []
 
@@ -38,6 +54,7 @@ with open(filename, "r") as file:
 
         try:
             time_ms.append(float(values[0]))
+            high_side_pressure.append(float(values[1]))
             low_side_pressure.append(float(values[2]))
 
             # Weight may occasionally not be transmitted.
@@ -57,10 +74,12 @@ with open(filename, "r") as file:
 # ============================================================
 
 time_ms = np.array(time_ms)
+high_side_pressure = np.array(high_side_pressure)
 low_side_pressure = np.array(low_side_pressure)
 weight_raw_kg = np.array(weight_raw_kg)
 
-
+high_side_pressure = moving_average(high_side_pressure, 20)
+low_side_pressure = moving_average(low_side_pressure, 20)
 # ============================================================
 # CONVERT TIME
 # ============================================================
@@ -373,7 +392,8 @@ time_mask = (
 )
 
 plot_time = time[time_mask]
-plot_pressure = low_side_pressure[time_mask]
+plot_high_pressure = high_side_pressure[time_mask]
+plot_low_pressure = low_side_pressure[time_mask]
 
 
 if weight_data_available:
@@ -391,7 +411,7 @@ plt.figure()
 
 plt.plot(
     plot_time,
-    plot_pressure,
+    plot_low_pressure,
     color="blue"
 )
 
@@ -471,7 +491,7 @@ if weight_data_available:
 
     ax2.plot(
         plot_time,
-        plot_pressure,
+        plot_low_pressure,
         color="orange",
         label="Low-side pressure"
     )
@@ -575,7 +595,99 @@ if weight_data_available:
 
     plt.tight_layout()
 
+# ============================================================
+# HIGH-SIDE PRESSURE VS TIME
+# ============================================================
 
+plt.figure()
+
+plt.plot(
+    plot_time,
+    plot_high_pressure
+)
+
+plt.xlabel("Time (s)")
+plt.ylabel("High-side pressure (bar)")
+plt.title("High-side Pressure vs Time")
+
+plt.xlim(start_time, end_time)
+plt.grid(True)
+plt.tight_layout()
+
+
+# ============================================================
+# HIGH-SIDE PRESSURE + FORCE
+# ============================================================
+
+if weight_data_available:
+
+    fig, ax1 = plt.subplots()
+
+    # Force
+    ax1.plot(
+        plot_time,
+        plot_force,
+        color="orange"
+    )
+
+    ax1.set_xlabel("Time (s)")
+    ax1.set_ylabel("Force (N)", color="orange")
+    ax1.tick_params(axis='y',labelcolor='orange')
+    ax1.grid(True)
+
+    # High-side pressure
+    ax2 = ax1.twinx()
+
+    ax2.plot(
+        plot_time,
+        plot_high_pressure,
+        color="blue"
+    )
+
+    ax2.set_ylabel("High-side pressure (bar)", color="blue")
+    ax2.tick_params(axis='y',labelcolor='blue')
+    ax1.set_xlim(start_time, end_time)
+
+    plt.title("Force and High-side Pressure vs Time")
+
+    fig.tight_layout()
+
+
+# ============================================================
+# HIGH-SIDE + LOW-SIDE PRESSURE
+# ============================================================
+
+fig, ax1 = plt.subplots()
+
+# High-side pressure
+ax1.plot(
+    plot_time,
+    plot_high_pressure,
+    color="blue"
+)
+
+ax1.set_xlabel("Time (s)")
+ax1.set_ylabel("High-side pressure (bar)", color="blue")
+ax1.tick_params(axis='y',labelcolor='blue')
+ax1.grid(True)
+
+# Low-side pressure
+ax2 = ax1.twinx()
+
+ax2.plot(
+    plot_time,
+    plot_low_pressure,
+    color="orange"
+)
+
+ax2.set_ylabel("Low-side pressure (bar)", color="orange")
+ax2.tick_params(axis='y',labelcolor='orange')
+
+ax1.set_xlim(start_time, end_time)
+
+plt.title("High-side and Low-side Pressure vs Time")
+
+fig.tight_layout()
 # ============================================================
 # SHOW ALL GRAPHS
 # ============================================================
