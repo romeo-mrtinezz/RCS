@@ -2,8 +2,11 @@
 #define __GLOBAL_H
 
 #include "ff.h"
+#include <stdbool.h>
 static FATFS FatFs;
 static FIL Fil;
+
+// Global variables
 
 // typedef struct {
 //     float Kp, Ki, Kd;
@@ -13,7 +16,7 @@ static FIL Fil;
 //     float error;
 // } PID_params;
 
-// Data types
+// Data types----------------------------
 typedef struct {
     float rate_x;
     float rate_y;

@@ -109,13 +109,13 @@ void pwm_logic(float acc_y) {
 
 }
 
-// int _write(int file, char *ptr, int len) {
-//   while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
-//     HAL_Delay(1);
-//   }
+int _write(int file, char *ptr, int len) {
+  while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
+    HAL_Delay(1);
+  }
 
-//   return(len);
-// }
+  return(len);
+}
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
   rx_flag = 1;
