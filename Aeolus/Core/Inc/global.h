@@ -51,7 +51,7 @@ typedef struct {
     float pitch_error;
     float yaw_error;
     float pitch_duty;
-    float yaw_duty;
+    float yaw_duty; 
 } FullData;
 
 typedef struct {

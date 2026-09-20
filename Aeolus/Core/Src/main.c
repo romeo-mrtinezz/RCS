@@ -49,6 +49,9 @@
 #include <string.h>
 #include <math.h>
 #include <sys/_intsup.h>
+#include "usbd_cdc_if.h"
+#include "usbd_def.h"
+
 
 /* USER CODE END Includes */
 
@@ -65,6 +68,11 @@ PID_params pid_pitch;
 PID_params pid_yaw;
 Attitude attitude;
 FullData full_data;
+extern uint8_t received_flag;
+extern uint32_t received_length;
+extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
+
+
 
 /* USER CODE END PD */
 
@@ -77,6 +85,11 @@ FullData full_data;
 /* USER CODE BEGIN PV */
 volatile uint8_t rx_flag = 0;
 char rx_buf[20];
+volatile uint8_t adc_flag = 0;
+volatile uint8_t rx_load_cell = 0;
+char load_cell_dma_buf[20];
+char load_cell_usb_buf[40];
+volatile uint8_t load_cell_ready;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,16 +122,37 @@ void pwm_logic(float acc_y) {
 
 }
 
-// int _write(int file, char *ptr, int len) {
-//   while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
-//     HAL_Delay(1);
-//   }
+int _write(int file, char *ptr, int len) {
+  while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY) {
+    HAL_Delay(1);
+  }
 
-//   return(len);
-// }
+  return(len);
+}
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-  HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
-  rx_flag = 1;
+  // RFD
+  if (huart->Instance == UART4) {
+    HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+    rx_flag = 1;
+  }
+  // Load cell
+  else if (huart->Instance == UART5) {
+    memcpy(load_cell_usb_buf, load_cell_dma_buf, 11);
+    load_cell_ready = 1;
+    HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 11);
+    HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+  
+  }
+}
+
+// void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+//   if (huart->Instance == UART5) {
+//     HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+//   }
+// }
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
+  adc_flag = 1;
 }
 /* USER CODE END PFP */
 
@@ -167,7 +201,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  // MX_USB_Device_Init(); // <-------------------------------------------------
+  MX_USB_Device_Init(); // <-------------------------------------------------
 
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
@@ -175,14 +209,33 @@ int main(void)
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
 
+  HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, 1);
+  HAL_Delay(3000);
   // Set solenoid valves initially closed
   TIM1->CCR1 = 0; // 5000 is 50% duty cycle for ARR = 10,000
   TIM1->CCR2 = 0;
 
   char msg[50] = "Hey";
   HAL_StatusTypeDef status;
+
+  // PT params-----------------------------
+  // volatile uint16_t adc_val[2];
+  // float high_pressure;
+  // float low_pressure;
+  // float high_pt_v;
+  // float low_pt_v;
+  // char pt_buf[70];
+
+  // float supply_voltage = 4.84; // 11.74V battery, configurable CHANGE TO 4.97 for USB
+  // float zero_voltage = 0.1*supply_voltage;
+  // float full_scale_voltage = 0.9*supply_voltage;
+  // float voltage_span = full_scale_voltage-zero_voltage;
+  // float pressure_span = 200; // 0-200 bar PT
+  // float pressure_offset = 0; // Constant offset if needed
   
+  // Need to iniatite once so that callback function will be called
   HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
+  HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 11);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -196,18 +249,62 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  { 
-    // status = HAL_UART_Transmit(&huart4, (uint8_t *)msg, strlen(msg), 100);  
-    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);  
-    // HAL_Delay(1000);
-    /* USER CODE END WHILE */
+  /* USER CODE END 3 */
+  uint32_t start = HAL_GetTick();
+  uint32_t duration;
 
-    /* USER CODE BEGIN 3 */
-  }
+  // while (1)
+  // {
+  //   HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
+  //   high_pt_v = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[0];
+  //   low_pt_v  = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[1];
+  //   high_pressure = (high_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset;
+  //   low_pressure = (low_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset;
+  //   // high_pressure = (high_pt_v - 0.5f)*50.0f + 3.6f; <------- this assumed that we were getting perfect 5V
+  //   // low_pressure  = (low_pt_v  - 0.5f)*50.0f + 3.6f;
+
+  //   // Send to laptop over usb
+  //   // CDC_Transmit_FS((uint8_t *)load_cell_dma_buf, 14);
+
+  //   // Restart transfer from load cell
+  //   // HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 14);
+  //   // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+  //   // rx_load_cell = 0;
+
+  //   // weight format A, <stx> <sign> <weightA(7)> <status> <etx>
+  //   //                 1 char, 1 char, 7 char,     1 char, 1 char  = 11 bytes
+
+  //   if (load_cell_ready) {
+  //     load_cell_ready = 0;
+  //     snprintf(load_cell_usb_buf, 12, "%.11s", load_cell_dma_buf);
+  //   }
+
+  //   if (received_flag == 1) { // USB
+  //     received_flag = 0;
+  //     if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
+  //       TIM1->CCR1 = 10000; // ARR is 10,000
+  //       // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+  //       printf("valve opened\n"); }
+  //     else if (strncmp((char*)UserRxBufferFS, "close", received_length) == 0) {
+  //       TIM1->CCR1 = 0;
+  //       // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+  //       printf("valve closed\n");
+  //     }
+  //   }
+
+  //   if (adc_flag) { // PT
+  //     HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+  //     adc_flag = 0;
+  //     duration = HAL_GetTick() - start;
+  //     snprintf(pt_buf, 60, "%lu,%.2f,%.2f,%.11s\n", duration, high_pressure, low_pressure, load_cell_usb_buf);
+
+  //     CDC_Transmit_FS((uint8_t *)pt_buf, strlen(pt_buf));  
+  //   }
+
+  //   HAL_Delay(50); // just under 60Hz
+  // }
   /* USER CODE END 3 */
 }
-
 /**
   * @brief System Clock Configuration
   * @retval None
