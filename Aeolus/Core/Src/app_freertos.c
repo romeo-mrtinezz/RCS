@@ -44,30 +44,10 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-extern USBD_HandleTypeDef hUsbDeviceFS;
-extern ADC_HandleTypeDef hadc2;
-
-extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
-extern uint8_t received_flag;
-extern uint32_t received_length;
-extern volatile uint8_t rx_flag;
-extern char rx_buf[20];
-extern char load_cell_dma_buf[20];
-extern char load_cell_usb_buf[40];
-extern volatile uint8_t load_cell_ready;
-extern volatile uint8_t adc_flag;
-extern volatile uint8_t rx_load_cell;
-
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-extern AccData accel_data;
-extern GyroData gyro_data;
-extern PID_params pid_pitch;
-extern PID_params pid_yaw;
-extern Attitude attitude;
-extern FullData full_data;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -77,6 +57,34 @@ extern FullData full_data;
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+// Global attitude-related structs -------------------------
+extern AccData accel_data;
+extern GyroData gyro_data;
+extern PID_params pid_pitch;
+extern PID_params pid_yaw;
+extern Attitude attitude;
+extern FullData full_data;
+
+// extern USBD_HandleTypeDef hUsbDeviceFS;
+extern ADC_HandleTypeDef hadc2;
+
+// USB variables, from usbd_cdc_if.h-----------------------
+extern uint8_t received_flag;
+extern uint32_t received_length;
+extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
+
+// Pressure ----------------------------------------------
+extern volatile uint8_t pt_adc_flag;
+extern volatile char pt_dma_buf[20];
+
+// RFD
+extern volatile uint8_t rfd_rx_flag;
+
+// Load cell
+extern char load_cell_dma_buf[20];
+extern char load_cell_usb_buf[40];
+extern volatile uint8_t rx_load_cell;
+extern volatile uint8_t load_cell_ready;
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
@@ -262,30 +270,10 @@ void StartControlLoop(void *argument)
 void StartReadIMU(void *argument)
 {
   /* USER CODE BEGIN StartReadIMU */
-  volatile uint16_t adc_val[2];
-  float high_pressure;
-  float low_pressure;
-  float high_pt_v;
-  float low_pt_v;
-  char pt_buf[100];
-
-  float supply_voltage = 4.97; // 11.74V battery, configurable CHANGE TO 4.97 for USB, 4.84 for battery only
-  float zero_voltage = 0.1*supply_voltage;
-  float full_scale_voltage = 0.9*supply_voltage;
-  float voltage_span = full_scale_voltage-zero_voltage;
-  float pressure_span = 200; // 0-200 bar PT
-  float pressure_offset1 = 3.8; // Constant offset if needed
-  float pressure_offset2 = 3.8;
   /* Infinite loop */
-  uint32_t start = xTaskGetTickCount();
-  uint32_t duration;
+
   for(;;)
   {
-    HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
-    high_pt_v = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[0];
-    low_pt_v  = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[1];
-    high_pressure = (high_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset1;
-    low_pressure = (low_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset2;
     // high_pressure = (high_pt_v - 0.5f)*50.0f + 3.6f; <------- this assumed that we were getting perfect 5V
     // low_pressure  = (low_pt_v  - 0.5f)*50.0f + 3.6f;
 
@@ -311,17 +299,6 @@ void StartReadIMU(void *argument)
         printf("valve closed\n");
       }
     }
-
-    if (adc_flag) { // PT
-      HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
-      adc_flag = 0;
-      duration = xTaskGetTickCount() - start;
-      snprintf(pt_buf, 100, "%lu,%.2f,%.2f,%.11s\n", duration, high_pressure, low_pressure, load_cell_usb_buf);
-      // if above truncates text, most likely buffer overflow because duration gets to a 6 digit string
-
-      // CDC_Transmit_FS((uint8_t *)pt_buf, strlen(pt_buf));
-      HAL_UART_Transmit(&huart4, (uint8_t *)pt_buf, strlen(pt_buf), 50);
-    }
      
     osDelay(14);
   /* USER CODE END StartReadIMU */
@@ -338,10 +315,43 @@ void StartReadIMU(void *argument)
 void StartStream(void *argument)
 {
   /* USER CODE BEGIN StartStream */
+  volatile uint16_t adc_val[2];
+  float high_pressure;
+  float low_pressure;
+  float high_pt_v;
+  float low_pt_v;
+  char pt_buf[100];
+
+  float supply_voltage = 4.97; // 11.74V battery, configurable CHANGE TO 4.97 for USB, 4.84 for battery only
+  float zero_voltage = 0.1*supply_voltage;
+  float full_scale_voltage = 0.9*supply_voltage;
+  float voltage_span = full_scale_voltage-zero_voltage;
+  float pressure_span = 200; // 0-200 bar PT
+  float pressure_offset1 = 3.8; // Constant offset if needed
+  float pressure_offset2 = 3.8;
+  uint32_t start = xTaskGetTickCount();
+  uint32_t duration;
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
+    high_pt_v = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[0];
+    low_pt_v  = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[1];
+    high_pressure = (high_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset1;
+    low_pressure = (low_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset2;
+    //
+
+    if (pt_adc_flag) { // PT
+      HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+      pt_adc_flag = 0;
+      duration = xTaskGetTickCount() - start;
+      snprintf(pt_buf, 100, "%lu,%.2f,%.2f,%.11s\n", duration, high_pressure, low_pressure, load_cell_usb_buf);
+      // if above truncates text, most likely buffer overflow because duration gets to a 6 digit string
+
+      // CDC_Transmit_FS((uint8_t *)pt_buf, strlen(pt_buf));
+      HAL_UART_Transmit(&huart4, (uint8_t *)pt_buf, strlen(pt_buf), 50);
+    }
+    osDelay(100); // 10Hz, 100ms
   }
   /* USER CODE END StartStream */
 }

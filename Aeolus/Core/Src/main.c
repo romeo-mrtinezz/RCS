@@ -60,19 +60,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-// extern osMessageQueueId_t messageQueueHandle;
-AccData accel_data;
-GyroData gyro_data;
-PID_params pid_pitch;
-PID_params pid_yaw;
-Attitude attitude;
-FullData full_data;
-extern uint8_t received_flag;
-extern uint32_t received_length;
-extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
-
-
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -82,13 +69,32 @@ extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-volatile uint8_t rx_flag = 0;
-char rx_buf[20];
-volatile uint8_t adc_flag = 0;
-volatile uint8_t rx_load_cell = 0;
+// Global attitude-related structs -------------------------
+AccData accel_data;
+GyroData gyro_data;
+PID_params pid_pitch;
+PID_params pid_yaw;
+Attitude attitude;
+FullData full_data;
+
+// USB variables, from usbd_cdc_if.h-----------------------
+extern uint8_t received_flag;
+extern uint32_t received_length;
+extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
+
+// Pressure ----------------------------------------------
+volatile uint8_t pt_adc_flag = 0;
+volatile char pt_dma_buf[20];
+
+// RFD
+volatile uint8_t rfd_rx_flag = 0;
+
+// Load cell
 char load_cell_dma_buf[20];
 char load_cell_usb_buf[40];
+volatile uint8_t rx_load_cell = 0;
 volatile uint8_t load_cell_ready;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -132,7 +138,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   // RFD
   if (huart->Instance == UART4) {
     HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
-    rx_flag = 1;
+    rfd_rx_flag = 1;
   }
   // Load cell
   else if (huart->Instance == UART5) {
@@ -146,7 +152,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
-  adc_flag = 1;
+  pt_adc_flag = 1;
 }
 /* USER CODE END PFP */
 
@@ -206,7 +212,7 @@ int main(void)
   TIM1->CCR2 = 0;
 
   // Need to iniatite once so that callback function will be called
-  HAL_UART_Receive_DMA(&huart4, (uint8_t *)rx_buf, 2);
+  HAL_UART_Receive_DMA(&huart4, (uint8_t *)pt_dma_buf, 2);
   HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 11);
   /* USER CODE END 2 */
 
