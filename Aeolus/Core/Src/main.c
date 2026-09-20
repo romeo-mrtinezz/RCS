@@ -253,56 +253,10 @@ int main(void)
   uint32_t start = HAL_GetTick();
   uint32_t duration;
 
-  // while (1)
-  // {
-  //   HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
-  //   high_pt_v = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[0];
-  //   low_pt_v  = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[1];
-  //   high_pressure = (high_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset;
-  //   low_pressure = (low_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset;
-  //   // high_pressure = (high_pt_v - 0.5f)*50.0f + 3.6f; <------- this assumed that we were getting perfect 5V
-  //   // low_pressure  = (low_pt_v  - 0.5f)*50.0f + 3.6f;
-
-  //   // Send to laptop over usb
-  //   // CDC_Transmit_FS((uint8_t *)load_cell_dma_buf, 14);
-
-  //   // Restart transfer from load cell
-  //   // HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 14);
-  //   // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
-  //   // rx_load_cell = 0;
-
-  //   // weight format A, <stx> <sign> <weightA(7)> <status> <etx>
-  //   //                 1 char, 1 char, 7 char,     1 char, 1 char  = 11 bytes
-
-  //   if (load_cell_ready) {
-  //     load_cell_ready = 0;
-  //     snprintf(load_cell_usb_buf, 12, "%.11s", load_cell_dma_buf);
-  //   }
-
-  //   if (received_flag == 1) { // USB
-  //     received_flag = 0;
-  //     if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
-  //       TIM1->CCR1 = 10000; // ARR is 10,000
-  //       // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
-  //       printf("valve opened\n"); }
-  //     else if (strncmp((char*)UserRxBufferFS, "close", received_length) == 0) {
-  //       TIM1->CCR1 = 0;
-  //       // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
-  //       printf("valve closed\n");
-  //     }
-  //   }
-
-  //   if (adc_flag) { // PT
-  //     HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
-  //     adc_flag = 0;
-  //     duration = HAL_GetTick() - start;
-  //     snprintf(pt_buf, 60, "%lu,%.2f,%.2f,%.11s\n", duration, high_pressure, low_pressure, load_cell_usb_buf);
-
-  //     CDC_Transmit_FS((uint8_t *)pt_buf, strlen(pt_buf));  
-  //   }
-
-  //   HAL_Delay(50); // just under 60Hz
-  // }
+  while (1)
+  {
+   
+  }
   /* USER CODE END 3 */
 }
 /**
