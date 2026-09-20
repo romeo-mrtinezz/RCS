@@ -19,6 +19,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
+#include "ff.h"
 #include "stm32g4xx_hal.h"
 #include "PID.h"
 #include "cmsis_os2.h"
@@ -80,10 +81,18 @@ extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 extern volatile uint8_t pt_adc_flag;
 extern volatile char pt_dma_buf[20];
 
+// PT params-----------------------------
+volatile uint16_t adc_val[2];
+float high_pressure;
+float low_pressure;
+float high_pt_v;
+float low_pt_v;
+char pt_buf[50];
+
 // RFD ------------------------------------------------------
 extern volatile uint8_t rfd_rx_flag;
 extern int rfd_tx_flag;
-char rfd_buf[100];
+char rfd_buf[200]; // buffer overflow woops maybe switch to snprintf
 
 // Load cell -----------------------------------------------
 extern char load_cell_dma_buf[20];
@@ -272,6 +281,8 @@ void StartControlLoop(void *argument)
 {
   /* USER CODE BEGIN StartControlLoop */
   float pitch_duty, yaw_duty;
+  pid_init(&pid_pitch);
+  pid_init(&pid_yaw);
   /* Infinite loop */
   for(;;)
   {
@@ -290,7 +301,7 @@ void StartControlLoop(void *argument)
   }
   /* USER CODE END StartControlLoop */
 }
-
+  
 /* USER CODE BEGIN Header_StartReadIMU */
 /**
   * @brief  Function implementing the readIMU thread.
@@ -348,28 +359,41 @@ void StartReadIMU(void *argument)
 void StartStream(void *argument)
 {
   /* USER CODE BEGIN StartStream */
+  float supply_voltage = 4.84; // 11.74V battery, configurable
+  float zero_voltage = 0.1*supply_voltage;
+  float full_scale_voltage = 0.9*supply_voltage;
+  float voltage_span = full_scale_voltage-zero_voltage;
+  float pressure_span = 200; // 0-200 bar PT
+  float pressure_offset = 0; // Constant offset if needed
   /* Infinite loop */
   for(;;)
   {
+    HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
+    high_pt_v = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[0];
+    low_pt_v  = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[1];
+    high_pressure = (high_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset;
+    low_pressure = (low_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset;
+
     // Pass in attitude struct atomically
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
 
     // Send over rfd, non-blocking
     if (rfd_tx_flag == 1) {
-      sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+      sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
         xTaskGetTickCount(),
         full_data.rate_x, full_data.rate_y, full_data.rate_z,
         full_data.acc_x, full_data.acc_y, full_data.acc_z,
         full_data.pitch_accel, full_data.yaw_accel,
         full_data.pitch, full_data.yaw,
         full_data.pitch_error, full_data.yaw_error,
-        full_data.pitch_duty, full_data.yaw_duty
+        full_data.pitch_duty, full_data.yaw_duty,
+        high_pressure, low_pressure
       );
       HAL_UART_Transmit_DMA(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf));
       rfd_tx_flag = 0; // ensures we only transmit after previos=us transmission completed
     }
     osMutexRelease(AttitudeMutexHandle);
-    osDelay(100); // 10Hz, 100ms
+    osDelay(95); // 10Hz, 100ms
   }
   /* USER CODE END StartStream */
 }
@@ -382,12 +406,48 @@ void StartStream(void *argument)
 */
 /* USER CODE END Header_StartLog */
 void StartLog(void *argument)
-{
+{ 
   /* USER CODE BEGIN StartLog */
+  FRESULT FR_Status;
+  UINT WWC;
+
+  FR_Status = f_mount(&FatFs, "", 0);
+  if (FR_Status != FR_OK) {
+    HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+  }
+
+  FR_Status = f_open(&Fil, "full_data.csv", FA_WRITE | FA_READ | FA_OPEN_ALWAYS);
+  if (FR_Status != FR_OK) {
+    // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+  }
+
+  char sd_buf[200];
+  float start = xTaskGetTickCount();
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    osMutexAcquire(AttitudeMutexHandle, 100);
+    sprintf(sd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+        xTaskGetTickCount(),
+        full_data.rate_x, full_data.rate_y, full_data.rate_z,
+        full_data.acc_x, full_data.acc_y, full_data.acc_z,
+        full_data.pitch_accel, full_data.yaw_accel,
+        full_data.pitch, full_data.yaw,
+        full_data.pitch_error, full_data.yaw_error,
+        full_data.pitch_duty, full_data.yaw_duty,
+        high_pressure, low_pressure
+      );
+    osMutexRelease(AttitudeMutexHandle);
+    f_write(&Fil, sd_buf, strlen(sd_buf), &WWC);
+    
+    if (xTaskGetTickCount()-start >= 10000) {// 10 sec
+      f_close(&Fil);
+      f_mount(NULL, "", 0);
+      HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+
+      osDelay(osWaitForever);
+    }
+    osDelay(1); // 100Hz, 10ms
   }
   /* USER CODE END StartLog */
 }

@@ -207,8 +207,6 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   // MX_USB_Device_Init(); // <-------------------------------------------------
-  pid_init(&pid_pitch);
-  pid_init(&pid_yaw);
 
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
