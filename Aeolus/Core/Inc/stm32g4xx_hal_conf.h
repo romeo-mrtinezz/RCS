@@ -78,7 +78,7 @@
 /**
   * @brief This is the list of modules where register callback can be used
   */
-#define USE_HAL_ADC_REGISTER_CALLBACKS        0U
+#define USE_HAL_ADC_REGISTER_CALLBACKS        1U
 #define USE_HAL_COMP_REGISTER_CALLBACKS       0U
 #define USE_HAL_CORDIC_REGISTER_CALLBACKS     0U
 #define USE_HAL_CRYP_REGISTER_CALLBACKS       0U
@@ -104,7 +104,7 @@
 #define USE_HAL_SPI_REGISTER_CALLBACKS        0U
 #define USE_HAL_SRAM_REGISTER_CALLBACKS       0U
 #define USE_HAL_TIM_REGISTER_CALLBACKS        0U
-#define USE_HAL_UART_REGISTER_CALLBACKS       0U
+#define USE_HAL_UART_REGISTER_CALLBACKS       1U
 #define USE_HAL_USART_REGISTER_CALLBACKS      0U
 #define USE_HAL_WWDG_REGISTER_CALLBACKS       0U
 

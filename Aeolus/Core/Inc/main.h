@@ -52,6 +52,8 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc);
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -91,8 +93,6 @@ void Error_Handler(void);
 #define EXTRA_TX_GPIO_Port GPIOA
 #define EXTRA_RX_Pin GPIO_PIN_10
 #define EXTRA_RX_GPIO_Port GPIOA
-#define RFD_RTS_Pin GPIO_PIN_15
-#define RFD_RTS_GPIO_Port GPIOA
 #define RFD_TX_Pin GPIO_PIN_10
 #define RFD_TX_GPIO_Port GPIOC
 #define RFD_RX_Pin GPIO_PIN_11
@@ -101,8 +101,6 @@ void Error_Handler(void);
 #define RS422_TX_GPIO_Port GPIOC
 #define RS422_RX_Pin GPIO_PIN_2
 #define RS422_RX_GPIO_Port GPIOD
-#define RFD_CTS_Pin GPIO_PIN_7
-#define RFD_CTS_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

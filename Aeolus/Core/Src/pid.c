@@ -40,7 +40,7 @@ float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, floa
 
 // pass in pointer to pid so we can update them directly instead of making 100 copies
 void pid_init(PID_params *pid) {
-    pid->Kp = 80, pid->Ki = 2, pid->Kd = 2;
+    pid->Kp = 130, pid->Ki = 0, pid->Kd = 0;
     pid -> integral = 0;
     pid -> prev_error = 0; 
     pid->min_duty = 0, pid->max_duty = 10000; // Duty cycle max 3800 6200
@@ -57,6 +57,8 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
     pid->prev_error = error;
 
     /*The following should produce the same magnitude of control signal, the select thruster logic is a separate function
+    for kp = 80, ki = 2, kd = 2
+    
     LOOP 1
     error  = -20 deg
     integral = -2
