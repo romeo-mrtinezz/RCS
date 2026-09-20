@@ -88,6 +88,8 @@ volatile char pt_dma_buf[20];
 
 // RFD----------------------------------------------------
 volatile uint8_t rfd_rx_flag = 0;
+int rfd_tx_flag = 1;
+
 
 // Load cell----------------------------------------------
 char load_cell_dma_buf[20];
@@ -150,6 +152,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   }
 }
 
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+  rfd_tx_flag = 1;
+  HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+};
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
   pt_adc_flag = 1;

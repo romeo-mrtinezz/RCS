@@ -19,9 +19,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
-#include "stm32g4xx_hal.h"
-#include "PID.h"
-#include "cmsis_os2.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -30,6 +27,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stm32g4xx_hal.h"
 #include "usart.h"
 #include "pid.h"
 #include "bmi088.h"
@@ -82,6 +80,7 @@ extern volatile char pt_dma_buf[20];
 
 // RFD ------------------------------------------------------
 extern volatile uint8_t rfd_rx_flag;
+extern int rfd_tx_flag;
 char rfd_buf[100];
 
 // Load cell -----------------------------------------------
@@ -357,10 +356,13 @@ void StartStream(void *argument)
         full_data.pitch_error, full_data.yaw_error,
         full_data.pitch_duty, full_data.yaw_duty
       );
-
-    // Send over rfd
-    HAL_UART_Transmit(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf), 100);
     osMutexRelease(AttitudeMutexHandle);
+
+    // Send over rfd, non-blocking
+    if (rfd_tx_flag == 1) {
+      HAL_UART_Transmit_DMA(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf));
+      rfd_tx_flag = 0; // ensures we only transmit after previos=us transmission completed
+    }
     osDelay(100); // 10Hz, 100ms
   }
   /* USER CODE END StartStream */
