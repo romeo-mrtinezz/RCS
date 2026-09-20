@@ -86,10 +86,10 @@ extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 volatile uint8_t pt_adc_flag = 0;
 volatile char pt_dma_buf[20];
 
-// RFD
+// RFD----------------------------------------------------
 volatile uint8_t rfd_rx_flag = 0;
 
-// Load cell
+// Load cell----------------------------------------------
 char load_cell_dma_buf[20];
 char load_cell_usb_buf[40];
 volatile uint8_t rx_load_cell = 0;

@@ -19,6 +19,9 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
+#include "stm32g4xx_hal.h"
+#include "PID.h"
+#include "cmsis_os2.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -77,14 +80,18 @@ extern uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 extern volatile uint8_t pt_adc_flag;
 extern volatile char pt_dma_buf[20];
 
-// RFD
+// RFD ------------------------------------------------------
 extern volatile uint8_t rfd_rx_flag;
+char rfd_buf[100];
 
-// Load cell
+// Load cell -----------------------------------------------
 extern char load_cell_dma_buf[20];
 extern char load_cell_usb_buf[40];
 extern volatile uint8_t rx_load_cell;
 extern volatile uint8_t load_cell_ready;
+
+// PID ----------------------------
+float pitch_duty, yaw_duty;
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
@@ -122,6 +129,13 @@ const osThreadAttr_t log_attributes = {
   .priority = (osPriority_t) osPriorityNormal5,
   .stack_size = 2000 * 4
 };
+/* Definitions for userMenu */
+osThreadId_t userMenuHandle;
+const osThreadAttr_t userMenu_attributes = {
+  .name = "userMenu",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 2000 * 4
+};
 /* Definitions for AttitudeMutex */
 osMutexId_t AttitudeMutexHandle;
 const osMutexAttr_t AttitudeMutex_attributes = {
@@ -143,6 +157,7 @@ void StartControlLoop(void *argument);
 void StartReadIMU(void *argument);
 void StartStream(void *argument);
 void StartLog(void *argument);
+void StartUserMenu(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -212,6 +227,9 @@ void MX_FREERTOS_Init(void) {
   /* creation of log */
   logHandle = osThreadNew(StartLog, NULL, &log_attributes);
 
+  /* creation of userMenu */
+  userMenuHandle = osThreadNew(StartUserMenu, NULL, &userMenu_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -255,7 +273,7 @@ void StartControlLoop(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    osDelay(200); // 5 Hz, 200ms
   }
   /* USER CODE END StartControlLoop */
 }
@@ -270,41 +288,43 @@ void StartControlLoop(void *argument)
 void StartReadIMU(void *argument)
 {
   /* USER CODE BEGIN StartReadIMU */
+  // HIGHEST PRIORITY TASK
+  float accel_pitch, accel_yaw;
+  float prev_pitch = 0, prev_yaw = 0;
+  float curr_pitch, curr_yaw;
   /* Infinite loop */
-
   for(;;)
   {
-    // high_pressure = (high_pt_v - 0.5f)*50.0f + 3.6f; <------- this assumed that we were getting perfect 5V
-    // low_pressure  = (low_pt_v  - 0.5f)*50.0f + 3.6f;
+    accel_burst_read(&accel_data);
+    gyro_burst_read(&gyro_data);
+    
+    accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
+    curr_pitch = comp_filter(0.6, 0.1, prev_pitch, -gyro_data.rate_z, accel_pitch); // change dt?
+    curr_yaw = comp_filter(0.6, 0.1, prev_yaw, -gyro_data.rate_y, accel_yaw); // could be gyro z?
+    prev_pitch = curr_pitch; 
+    prev_yaw = curr_yaw;
 
-    if (load_cell_ready) {
-      load_cell_ready = 0;
-      snprintf(load_cell_usb_buf, 12, "%.11s", load_cell_dma_buf);
-    }
+      // Write to shared struct safely to pass to PID controller and to log
+    osMutexAcquire(AttitudeMutexHandle, osWaitForever);
+    // attitude.est_pitch = curr_pitch;
+    // attitude.est_yaw = curr_yaw;
 
-    if (received_flag == 1) { // USB
-      received_flag = 0;
-      if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
-        TIM1->CCR1 = 10000; // ARR is 10,000, currently PWM freq is 10Hz
-        // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
-        // EDIT HERE FOR MAPPING LOGIC-------------------------------------------------
-        printf("valve opened\n"); 
-        osDelay(100); // ms
-        TIM1->CCR1 = 0;
-        printf("valve closed\n");
-      }
-      else if (strncmp((char*)UserRxBufferFS, "close", received_length) == 0) {
-        TIM1->CCR1 = 0;
-        // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
-        printf("valve closed\n");
-      }
-    }
-     
-    osDelay(14);
+    full_data.rate_x = gyro_data.rate_x;
+    full_data.rate_y = gyro_data.rate_y;
+    full_data.rate_z = gyro_data.rate_z;
+    full_data.acc_x = accel_data.acc_x;
+    full_data.acc_y = accel_data.acc_y;
+    full_data.acc_z = accel_data.acc_z;
+    full_data.pitch_accel = accel_pitch;
+    full_data.yaw_accel = accel_yaw;
+    full_data.pitch = curr_pitch;
+    full_data.yaw = curr_yaw;
+    osMutexRelease(AttitudeMutexHandle);
+
+    osDelay(10); // 100 Hz, 10ms
   /* USER CODE END StartReadIMU */
   }
 }
-
 /* USER CODE BEGIN Header_StartStream */
 /**
 * @brief Function implementing the stream thread.
@@ -315,42 +335,32 @@ void StartReadIMU(void *argument)
 void StartStream(void *argument)
 {
   /* USER CODE BEGIN StartStream */
-  volatile uint16_t adc_val[2];
-  float high_pressure;
-  float low_pressure;
-  float high_pt_v;
-  float low_pt_v;
-  char pt_buf[100];
-
-  float supply_voltage = 4.97; // 11.74V battery, configurable CHANGE TO 4.97 for USB, 4.84 for battery only
-  float zero_voltage = 0.1*supply_voltage;
-  float full_scale_voltage = 0.9*supply_voltage;
-  float voltage_span = full_scale_voltage-zero_voltage;
-  float pressure_span = 200; // 0-200 bar PT
-  float pressure_offset1 = 3.8; // Constant offset if needed
-  float pressure_offset2 = 3.8;
-  uint32_t start = xTaskGetTickCount();
-  uint32_t duration;
   /* Infinite loop */
   for(;;)
   {
-    HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
-    high_pt_v = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[0];
-    low_pt_v  = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[1];
-    high_pressure = (high_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset1;
-    low_pressure = (low_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset2;
-    //
+        // Pass in attitude struct atomically
+    osMutexAcquire(AttitudeMutexHandle, osWaitForever);
+    pitch_duty = pid_update(&pid_pitch, 0, full_data.pitch, 0.1);
+    yaw_duty = pid_update(&pid_yaw, 0,  full_data.yaw, 0.1);
+    full_data.pitch_error = pid_pitch.error;
+    full_data.yaw_error = pid_yaw.error;
+    full_data.pitch_duty = pitch_duty;
+    full_data.yaw_duty = yaw_duty;
 
-    if (pt_adc_flag) { // PT
-      HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
-      pt_adc_flag = 0;
-      duration = xTaskGetTickCount() - start;
-      snprintf(pt_buf, 100, "%lu,%.2f,%.2f,%.11s\n", duration, high_pressure, low_pressure, load_cell_usb_buf);
-      // if above truncates text, most likely buffer overflow because duration gets to a 6 digit string
+    // Copy buffer data into buffer for rfd
+    sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+        xTaskGetTickCount(),
+        full_data.rate_x, full_data.rate_y, full_data.rate_z,
+        full_data.acc_x, full_data.acc_y, full_data.acc_z,
+        full_data.pitch_accel, full_data.yaw_accel,
+        full_data.pitch, full_data.yaw,
+        full_data.pitch_error, full_data.yaw_error,
+        full_data.pitch_duty, full_data.yaw_duty
+      );
 
-      // CDC_Transmit_FS((uint8_t *)pt_buf, strlen(pt_buf));
-      HAL_UART_Transmit(&huart4, (uint8_t *)pt_buf, strlen(pt_buf), 50);
-    }
+    // Send over rfd
+    HAL_UART_Transmit(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf), 100);
+    osMutexRelease(AttitudeMutexHandle);
     osDelay(100); // 10Hz, 100ms
   }
   /* USER CODE END StartStream */
@@ -372,6 +382,39 @@ void StartLog(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartLog */
+}
+
+/* USER CODE BEGIN Header_StartUserMenu */
+/**
+* @brief Function implementing the userMenu thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartUserMenu */
+void StartUserMenu(void *argument)
+{
+  /* USER CODE BEGIN StartUserMenu */
+  /* Infinite loop */
+  for(;;)
+  {
+    // if (received_flag == 1) { // USB
+    //   received_flag = 0;
+    //   if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
+    //     TIM1->CCR1 = 10000; // ARR is 10,000, currently PWM freq is 10Hz
+    //     printf("valve opened\n"); 
+    //     osDelay(100); // ms
+    //     TIM1->CCR1 = 0;
+    //     printf("valve closed\n");
+    //   }
+    //   else if (strncmp((char*)UserRxBufferFS, "close", received_length) == 0) {
+    //     TIM1->CCR1 = 0;
+    //     // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+    //     printf("valve closed\n");
+    //   }
+    // }
+    osDelay(1);
+  }
+  /* USER CODE END StartUserMenu */
 }
 
 /* Private application code --------------------------------------------------*/
