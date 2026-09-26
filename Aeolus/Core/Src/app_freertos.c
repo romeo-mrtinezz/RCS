@@ -104,6 +104,7 @@ extern volatile uint8_t load_cell_ready;
 
 // PID ----------------------------
 float pitch_duty, yaw_duty;
+int activate_thrusters = 0;
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
@@ -298,7 +299,9 @@ void StartControlLoop(void *argument)
     full_data.yaw_duty = yaw_duty; 
     osMutexRelease(AttitudeMutexHandle);
     
-    select_thruster(pid_pitch.error, pitch_duty, pid_yaw.error, yaw_duty, 0.2);
+    if (activate_thrusters == 1) {
+      select_thruster(pid_pitch.error, pitch_duty, pid_yaw.error, yaw_duty, 0.2);
+    }
     osDelay(100); // 10 Hz, 100ms
   }
   /* USER CODE END StartControlLoop */
@@ -483,11 +486,12 @@ void StartUserMenu(void *argument)
     //     printf("valve closed\n");
     //   }
     // }
-    // if (rfd_rx_flag) {
-    //   HAL_UART_Receive_DMA(&huart4, (uint8_t *)rfd_rx_buf, strlen("start"));
-    //   HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
-    //   rfd_rx_flag = 0;
-    // }
+    if (rfd_rx_flag) {
+      HAL_UART_Receive_DMA(&huart4, (uint8_t *)rfd_rx_buf, strlen("start"));
+      activate_thrusters = 1;
+      // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+      rfd_rx_flag = 0;
+    }
     osDelay(1000); // 1Hz, 1000ms
   }
   /* USER CODE END StartUserMenu */
