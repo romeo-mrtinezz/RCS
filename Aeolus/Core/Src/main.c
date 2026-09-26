@@ -24,6 +24,7 @@
 #include "dma.h"
 #include "app_fatfs.h"
 #include "spi.h"
+#include "stm32g4xx_hal_tim.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -139,7 +140,7 @@ int _write(int file, char *ptr, int len) {
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   // RFD
   if (huart->Instance == UART4) {
-    HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
     rfd_rx_flag = 1;
   }
   // Load cell
@@ -210,12 +211,17 @@ int main(void)
 
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+
   if (accel_init() != 30) {
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
   // Set solenoid valves initially closed
   TIM1->CCR1 = 0; // 5000 is 50% duty cycle for ARR = 10,000
   TIM1->CCR2 = 0;
+  TIM1->CCR3 = 0;
+  TIM1->CCR4 = 0;
 
   // Need to iniatite once so that callback function will be called
   HAL_UART_Receive_DMA(&huart4, (uint8_t *)pt_dma_buf, 2);

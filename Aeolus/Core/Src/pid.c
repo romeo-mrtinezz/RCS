@@ -40,7 +40,7 @@ float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, floa
 
 // pass in pointer to pid so we can update them directly instead of making 100 copies
 void pid_init(PID_params *pid) {
-    pid->Kp = 130, pid->Ki = 0, pid->Kd = 0;
+    pid->Kp = 10000, pid->Ki = 0, pid->Kd = 0;
     pid -> integral = 0;
     pid -> prev_error = 0; 
     pid->min_duty = 0, pid->max_duty = 10000; // Duty cycle max 3800 6200
@@ -115,7 +115,7 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
 
 void select_thruster(float pitch_error, float pitch_duty, float yaw_error, float yaw_duty, float dt) {
     // map PWM to total impulse desired? thrust*seconds. maybe not needed tbh.
-    int ACCEPTABLE = 5; // degrees
+    float ACCEPTABLE = 1.5; // degrees
     if (pitch_error < -ACCEPTABLE) {
         // actuate pitch thruster in +ve
         TIM1->CCR1 = pitch_duty; 
@@ -150,3 +150,4 @@ void select_thruster(float pitch_error, float pitch_duty, float yaw_error, float
 
 
 }
+  

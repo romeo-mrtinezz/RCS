@@ -24,6 +24,7 @@
 #include "PID.h"
 #include "cmsis_os2.h"
 #include "stm32g4xx_hal_gpio.h"
+#include "stm32g4xx_hal_uart.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -93,6 +94,7 @@ char pt_buf[50];
 extern volatile uint8_t rfd_rx_flag;
 extern int rfd_tx_flag;
 char rfd_buf[200]; // buffer overflow woops maybe switch to snprintf
+char rfd_rx_buf[30];
 
 // Load cell -----------------------------------------------
 extern char load_cell_dma_buf[20];
@@ -289,7 +291,7 @@ void StartControlLoop(void *argument)
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
     pitch_duty = pid_update(&pid_pitch, 0, full_data.pitch, 0.2);
     yaw_duty = pid_update(&pid_yaw, 0, full_data.yaw, 0.2);
-    HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+    // HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
     full_data.pitch_error = pid_pitch.error;
     full_data.yaw_error = pid_yaw.error;
     full_data.pitch_duty = pitch_duty;
@@ -297,7 +299,7 @@ void StartControlLoop(void *argument)
     osMutexRelease(AttitudeMutexHandle);
     
     select_thruster(pid_pitch.error, pitch_duty, pid_yaw.error, yaw_duty, 0.2);
-    osDelay(200); // 5 Hz, 200ms
+    osDelay(100); // 10 Hz, 100ms
   }
   /* USER CODE END StartControlLoop */
 }
@@ -364,15 +366,16 @@ void StartStream(void *argument)
   float full_scale_voltage = 0.9*supply_voltage;
   float voltage_span = full_scale_voltage-zero_voltage;
   float pressure_span = 200; // 0-200 bar PT
-  float pressure_offset = 0; // Constant offset if needed
+  float pressure_offset1 = 3.8; // Constant offset if needed
+  float pressure_offset2 = 3.8;
   /* Infinite loop */
   for(;;)
   {
     HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc_val, 2);
     high_pt_v = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[0];
     low_pt_v  = (13.6f/10.0f)*(3.3f/4095.0f)*adc_val[1];
-    high_pressure = (high_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset;
-    low_pressure = (low_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset;
+    high_pressure = (high_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset1;
+    low_pressure = (low_pt_v - zero_voltage)*(pressure_span/voltage_span) + pressure_offset2;
 
     // Pass in attitude struct atomically
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
@@ -416,7 +419,7 @@ void StartLog(void *argument)
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
 
-  FR_Status = f_open(&Fil, "full_data.csv", FA_WRITE | FA_READ | FA_OPEN_ALWAYS);
+  FR_Status = f_open(&Fil, "full_data.csv", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
   if (FR_Status != FR_OK) {
     // HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
@@ -429,7 +432,7 @@ void StartLog(void *argument)
     osMutexAcquire(AttitudeMutexHandle, 100);
     sprintf(sd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
         xTaskGetTickCount(),
-        full_data.rate_x, full_data.rate_y, full_data.rate_z,
+        full_data.rate_x, full_data.rate_y, full_data.rate_z,  
         full_data.acc_x, full_data.acc_y, full_data.acc_z,
         full_data.pitch_accel, full_data.yaw_accel,
         full_data.pitch, full_data.yaw,
@@ -440,7 +443,7 @@ void StartLog(void *argument)
     osMutexRelease(AttitudeMutexHandle);
     f_write(&Fil, sd_buf, strlen(sd_buf), &WWC);
     
-    if (xTaskGetTickCount()-start >= 10000) {// 10 sec
+    if (xTaskGetTickCount()-start >= 120000) {// 2 minutes
       f_close(&Fil);
       f_mount(NULL, "", 0);
       HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
@@ -480,7 +483,12 @@ void StartUserMenu(void *argument)
     //     printf("valve closed\n");
     //   }
     // }
-    osDelay(1);
+    // if (rfd_rx_flag) {
+    //   HAL_UART_Receive_DMA(&huart4, (uint8_t *)rfd_rx_buf, strlen("start"));
+    //   HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
+    //   rfd_rx_flag = 0;
+    // }
+    osDelay(1000); // 1Hz, 1000ms
   }
   /* USER CODE END StartUserMenu */
 }
