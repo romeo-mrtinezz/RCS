@@ -15,5 +15,6 @@ float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, floa
 void  control_init(void);
 void  control_update(float pitch, float yaw, float dt, control_out *out);  // compute only
 void  control_apply(void);                                                 // write the valves from the last update
+void  control_reset(void);                                                 // zero the integral (call while disarmed)
 
 #endif /*__CONTROL_H*/

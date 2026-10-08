@@ -31,16 +31,23 @@ because it would for the varying duty cycles to take effect
 
 // pass in pointer to pid so we can update them directly instead of making 100 copies
 void pid_init(PID_params *pid) {
-    pid->Kp = 600, pid->Ki = 0, pid->Kd = 1200;    // was 1200 with dt 0.2, same behaviour now dt is 0.1
+    pid->Kp = 600, pid->Ki = 300, pid->Kd = 600;
     pid -> integral = 0;
     pid -> prev_error = 0; 
     pid->min_duty = 0, pid->max_duty = 10000; // Duty cycle max 3800 6200
 }
 
+#define I_LIMIT  4000.0f   // max counts the I term can add (40% duty)
+
 float pid_update(PID_params *pid, float set_point, float angle_estimate, float dt) {
     float error = set_point - angle_estimate;
     pid->error = error;
     pid->integral += error*dt;
+    if (pid->Ki > 0) {                       // cap so it can't wind up
+        float lim = I_LIMIT / pid->Ki;
+        if (pid->integral >  lim) pid->integral =  lim;
+        if (pid->integral < -lim) pid->integral = -lim;
+    }
 
     float P = pid->Kp*error;
     float I = pid->Ki*pid->integral;
@@ -125,10 +132,10 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
 #define DEADBAND_ON_ERROR   0
 #define DEADBAND_ON_OUTPUT  1
 
-#define DEADBAND_MODE  DEADBAND_ON_OUTPUT  // <-- change this
-#define DEADBAND_DEG   0.5f                 // <-- deadband size in degrees
-#define NEAR_DEG       0.5f                 // within this angle...
-#define RATE_DEADBAND  8.0f                 // ...and slower than this (deg/s), don't fire
+#define DEADBAND_MODE  DEADBAND_ON_OUTPUT
+#define DEADBAND_DEG   0.5f
+#define NEAR_DEG       0.5f
+#define RATE_DEADBAND  4.0f
 // ==========================================================================
 
 // Fire one valve of an axis from a signed control value.
@@ -164,6 +171,6 @@ static void drive_axis(const PID_params *pid, float u,
 //   Yaw:   +u -> CCR2, -u -> CCR4
 void select_thruster(const PID_params *pitch, float pitch_u,
                      const PID_params *yaw, float yaw_u) {
-    drive_axis(pitch, pitch_u, &TIM1->CCR1, &TIM1->CCR3);
-    drive_axis(yaw,   yaw_u,   &TIM1->CCR2, &TIM1->CCR4);
-}   
+    drive_axis(pitch, pitch_u, &TIM1->CCR1, &TIM1->CCR2);
+    drive_axis(yaw,   yaw_u,   &TIM1->CCR3, &TIM1->CCR4);
+}

@@ -297,7 +297,7 @@ void StartControlLoop(void *argument)
   for(;;)
   {
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
-    control_update(full_data.pitch, full_data.yaw, 0.2f, &ctrl);
+    control_update(full_data.pitch, full_data.yaw, 0.1f, &ctrl);
     HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
     full_data.pitch_error = ctrl.pitch_error;
     full_data.yaw_error   = ctrl.yaw_error;
@@ -310,6 +310,7 @@ void StartControlLoop(void *argument)
       control_apply();
     } else {
       thrusters_all_off();  // disarmed: valves held shut regardless of angle
+      control_reset();      // integral starts from 0 every time you arm
     }
     osDelay(100); // 10 Hz, 100ms
   }

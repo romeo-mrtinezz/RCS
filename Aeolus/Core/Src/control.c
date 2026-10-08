@@ -4,7 +4,7 @@
 #include "pid.h"
 static PID_params pitch, yaw;
 static float pitch_u, yaw_u;
-#elif CONTROLLER == CTRL_PID
+#elif CONTROLLER == CTRL_BANGBANG
 #include "bangbang.h"
 static BB_params pitch, yaw;
 #else
@@ -49,5 +49,13 @@ void control_apply(void)
     select_thruster(&pitch, pitch_u, &yaw, yaw_u);
 #elif CONTROLLER == CTRL_BANGBANG
     bb_select_thruster(&pitch, &yaw);
+#endif
+}
+
+void control_reset(void)
+{
+#if CONTROLLER == CTRL_PID
+    pitch.integral = 0;
+    yaw.integral   = 0;
 #endif
 }
