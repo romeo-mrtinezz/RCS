@@ -33,7 +33,7 @@
 /* USER CODE BEGIN Includes */
 #include "bmi088.h"
 #include "ff.h"
-#include "pid.h"
+#include "control.h"
 #include "global.h"
 #include "sd.h"
 #include "usbd_cdc_if.h"
@@ -73,8 +73,6 @@
 // Global attitude-related structs -------------------------
 AccData accel_data;
 GyroData gyro_data;
-PID_params pid_pitch;
-PID_params pid_yaw;
 FullData full_data;
 
 // USB variables, from usbd_cdc_if.h-----------------------
@@ -89,6 +87,16 @@ volatile char pt_dma_buf[20];
 // RFD----------------------------------------------------
 volatile uint8_t rfd_rx_flag = 0;
 int rfd_tx_flag = 1;
+
+// RFD command receive (start / stop / ping) ---------------
+volatile char rfd_rx_byte;              // one received byte from DMA
+char rfd_cmd[16];                       // command being assembled
+volatile uint8_t rfd_cmd_len = 0;
+volatile uint8_t rfd_cmd_ready = 0;     // 1 = complete command waiting
+volatile uint32_t rfd_last_rx_tick = 0; // tick of last complete command
+
+// Thruster arming: board boots DISARMED, only "start" over radio enables
+volatile uint8_t thrusters_armed = 0;
 
 
 // Load cell----------------------------------------------
@@ -139,8 +147,18 @@ int _write(int file, char *ptr, int len) {
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   // RFD
   if (huart->Instance == UART4) {
-    HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
+    char c = rfd_rx_byte;
+    if (c == '\r' || c == '\n') {
+      if (rfd_cmd_len > 0 && !rfd_cmd_ready) {
+        rfd_cmd[rfd_cmd_len] = '\0';
+        rfd_cmd_ready = 1;
+      }
+      rfd_cmd_len = 0;
+    } else if (!rfd_cmd_ready && rfd_cmd_len < sizeof(rfd_cmd) - 1) {
+      rfd_cmd[rfd_cmd_len++] = c;
+    }
     rfd_rx_flag = 1;
+    HAL_UART_Receive_DMA(&huart4, (uint8_t *)&rfd_rx_byte, 1); // listen for next byte
   }
   // Load cell
   else if (huart->Instance == UART5) {
@@ -149,6 +167,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 11);
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   
+  }
+}
+
+// If radio noise causes a UART error, HAL stops receiving. Restart it so a
+// "stop" command can always get through.
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+  if (huart->Instance == UART4) {
+    rfd_cmd_len = 0;
+    HAL_UART_Receive_DMA(&huart4, (uint8_t *)&rfd_rx_byte, 1);
   }
 }
 
@@ -210,15 +237,19 @@ int main(void)
 
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
   if (accel_init() != 30) {
     HAL_GPIO_TogglePin(RED_LED_GPIO_Port, RED_LED_Pin);
   }
   // Set solenoid valves initially closed
   TIM1->CCR1 = 0; // 5000 is 50% duty cycle for ARR = 10,000
   TIM1->CCR2 = 0;
+  TIM1->CCR3 = 0;
+  TIM1->CCR4 = 0;
 
   // Need to iniatite once so that callback function will be called
-  HAL_UART_Receive_DMA(&huart4, (uint8_t *)pt_dma_buf, 2);
+  HAL_UART_Receive_DMA(&huart4, (uint8_t *)&rfd_rx_byte, 1); // RFD commands, 1 byte at a time
   HAL_UART_Receive_DMA(&huart5, (uint8_t *)load_cell_dma_buf, 11);
   /* USER CODE END 2 */
 

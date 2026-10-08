@@ -21,7 +21,6 @@
 #include "FreeRTOS.h"
 #include "ff.h"
 #include "stm32g4xx_hal.h"
-#include "PID.h"
 #include "cmsis_os2.h"
 #include "stm32g4xx_hal_gpio.h"
 #include "task.h"
@@ -33,7 +32,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "usart.h"
-#include "pid.h"
+#include "control.h"
 #include "bmi088.h"
 #include "sd.h"
 #include "global.h"
@@ -65,8 +64,6 @@
 // Global attitude-related structs -------------------------
 extern AccData accel_data;
 extern GyroData gyro_data;
-extern PID_params pid_pitch;
-extern PID_params pid_yaw;
 extern FullData full_data;
 
 // extern USBD_HandleTypeDef hUsbDeviceFS;
@@ -92,7 +89,21 @@ char pt_buf[50];
 // RFD ------------------------------------------------------
 extern volatile uint8_t rfd_rx_flag;
 extern int rfd_tx_flag;
-char rfd_buf[200]; // buffer overflow woops maybe switch to snprintf
+char rfd_buf[256];
+
+// RFD commands + thruster arming (defined in main.c)
+extern char rfd_cmd[16];
+extern volatile uint8_t rfd_cmd_ready;
+extern volatile uint32_t rfd_last_rx_tick;
+extern volatile uint8_t thrusters_armed;
+
+// Auto-disarm if no command (start/stop/ping) arrives for this long while armed.
+// Protects against losing the radio link with thrusters enabled. 0 = off.
+#define LINK_TIMEOUT_MS 3000
+
+static void thrusters_all_off(void) {
+  TIM1->CCR1 = 0; TIM1->CCR2 = 0; TIM1->CCR3 = 0; TIM1->CCR4 = 0;
+}
 
 // Load cell -----------------------------------------------
 extern char load_cell_dma_buf[20];
@@ -280,24 +291,27 @@ void StartDefaultTask(void *argument)
 void StartControlLoop(void *argument)
 {
   /* USER CODE BEGIN StartControlLoop */
-  float pitch_duty, yaw_duty;
-  pid_init(&pid_pitch);
-  pid_init(&pid_yaw);
+  control_out ctrl;   // controller picked in control.h
+  control_init();
   /* Infinite loop */
   for(;;)
   {
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
-    pitch_duty = pid_update(&pid_pitch, 0, full_data.pitch, 0.2);
-    yaw_duty = pid_update(&pid_yaw, 0, full_data.yaw, 0.2);
+    control_update(full_data.pitch, full_data.yaw, 0.2f, &ctrl);
     HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
-    full_data.pitch_error = pid_pitch.error;
-    full_data.yaw_error = pid_yaw.error;
-    full_data.pitch_duty = pitch_duty;
-    full_data.yaw_duty = yaw_duty; 
+    full_data.pitch_error = ctrl.pitch_error;
+    full_data.yaw_error   = ctrl.yaw_error;
+    // signed output: sign says which valve the controller wants
+    full_data.pitch_duty  = ctrl.pitch_u;
+    full_data.yaw_duty    = ctrl.yaw_u;
     osMutexRelease(AttitudeMutexHandle);
-    
-    select_thruster(pid_pitch.error, pitch_duty, pid_yaw.error, yaw_duty, 0.2);
-    osDelay(200); // 5 Hz, 200ms
+
+    if (thrusters_armed) {
+      control_apply();
+    } else {
+      thrusters_all_off();  // disarmed: valves held shut regardless of angle
+    }
+    osDelay(100); // 10 Hz, 100ms
   }
   /* USER CODE END StartControlLoop */
 }
@@ -323,8 +337,8 @@ void StartReadIMU(void *argument)
     gyro_burst_read(&gyro_data);
     
     accel_to_angle(accel_data, &accel_pitch, &accel_yaw);
-    curr_pitch = comp_filter(0.6, 0.1, prev_pitch, -gyro_data.rate_z, accel_pitch); // change dt?
-    curr_yaw = comp_filter(0.6, 0.1, prev_yaw, -gyro_data.rate_y, accel_yaw); // could be gyro z?
+    curr_pitch = comp_filter(0.98, 0.01, prev_pitch, -gyro_data.rate_y, accel_pitch);
+    curr_yaw = comp_filter(0.98, 0.01, prev_yaw, -gyro_data.rate_z, accel_yaw);
     prev_pitch = curr_pitch; 
     prev_yaw = curr_yaw;
 
@@ -364,7 +378,7 @@ void StartStream(void *argument)
   float full_scale_voltage = 0.9*supply_voltage;
   float voltage_span = full_scale_voltage-zero_voltage;
   float pressure_span = 200; // 0-200 bar PT
-  float pressure_offset = 0; // Constant offset if needed
+  float pressure_offset = 3.5; // Constant offset if needed
   /* Infinite loop */
   for(;;)
   {
@@ -379,7 +393,9 @@ void StartStream(void *argument)
 
     // Send over rfd, non-blocking
     if (rfd_tx_flag == 1) {
-      sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+      // 17 data values + real CCR1..CCR4 + armed flag (22 values)
+      snprintf(rfd_buf, sizeof(rfd_buf),
+        "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%lu,%lu,%lu,%lu,%u\r\n",
         xTaskGetTickCount(),
         full_data.rate_x, full_data.rate_y, full_data.rate_z,
         full_data.acc_x, full_data.acc_y, full_data.acc_z,
@@ -387,7 +403,10 @@ void StartStream(void *argument)
         full_data.pitch, full_data.yaw,
         full_data.pitch_error, full_data.yaw_error,
         full_data.pitch_duty, full_data.yaw_duty,
-        high_pressure, low_pressure
+        high_pressure, low_pressure,
+        (unsigned long)TIM1->CCR1, (unsigned long)TIM1->CCR2,
+        (unsigned long)TIM1->CCR3, (unsigned long)TIM1->CCR4,
+        (unsigned)thrusters_armed
       );
       HAL_UART_Transmit_DMA(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf));
       rfd_tx_flag = 0; // ensures we only transmit after previos=us transmission completed
@@ -465,6 +484,26 @@ void StartUserMenu(void *argument)
   /* Infinite loop */
   for(;;)
   {
+    // ---- RFD commands: start / stop / ping ----
+    if (rfd_cmd_ready) {
+      rfd_last_rx_tick = xTaskGetTickCount();
+      if (strcmp(rfd_cmd, "start") == 0) {
+        thrusters_armed = 1;
+      } else if (strcmp(rfd_cmd, "stop") == 0) {
+        thrusters_armed = 0;
+        thrusters_all_off();
+      }
+      // "ping" (or anything else) just refreshes the link timer
+      rfd_cmd_ready = 0;
+    }
+
+    // ---- link-loss failsafe ----
+    if (LINK_TIMEOUT_MS > 0 && thrusters_armed &&
+        (xTaskGetTickCount() - rfd_last_rx_tick) > LINK_TIMEOUT_MS) {
+      thrusters_armed = 0;
+      thrusters_all_off();
+    }
+
     // if (received_flag == 1) { // USB
     //   received_flag = 0;
     //   if(strncmp((char*)UserRxBufferFS, "open", received_length) == 0) {
@@ -480,7 +519,7 @@ void StartUserMenu(void *argument)
     //     printf("valve closed\n");
     //   }
     // }
-    osDelay(1);
+    osDelay(10);
   }
   /* USER CODE END StartUserMenu */
 }
@@ -489,4 +528,3 @@ void StartUserMenu(void *argument)
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
-

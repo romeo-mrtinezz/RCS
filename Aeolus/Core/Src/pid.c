@@ -1,5 +1,3 @@
-
-
 // Attempt at implementing PID control algorithm
 
 // send control signal to pwm logic function. if control > x, duty cycle = y etc.
@@ -26,21 +24,14 @@ because it would for the varying duty cycles to take effect
 #include "main.h"
 #include "global.h"
 #include <stdlib.h>
+#include <math.h>
 // extern TIM_HandleTypeDef htim1;
 
 
 
-/*
-Produces filtered angle in 1 axis, i.e. call twice for pitch and yaw 
-*/
-float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, float accel_angle) {
-    float angle = alpha*(prev_angle + gyro_rate * dt) + (1-alpha)*accel_angle;
-    return angle;
-}
-
 // pass in pointer to pid so we can update them directly instead of making 100 copies
 void pid_init(PID_params *pid) {
-    pid->Kp = 130, pid->Ki = 0, pid->Kd = 0;
+    pid->Kp = 600, pid->Ki = 0, pid->Kd = 1200;    // was 1200 with dt 0.2, same behaviour now dt is 0.1
     pid -> integral = 0;
     pid -> prev_error = 0; 
     pid->min_duty = 0, pid->max_duty = 10000; // Duty cycle max 3800 6200
@@ -54,6 +45,7 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
     float P = pid->Kp*error;
     float I = pid->Ki*pid->integral;
     float D = pid->Kd*(error-pid->prev_error)/dt;
+    pid->rate = (error - pid->prev_error) / dt;   // error rate, deg/s
     pid->prev_error = error;
 
     /*The following should produce the same magnitude of control signal, the select thruster logic is a separate function
@@ -96,57 +88,82 @@ float pid_update(PID_params *pid, float set_point, float angle_estimate, float d
     control = 706
     */
 
-    float control = abs(P+I+D); // absolute value because we can't have -ve duty cycle
-    pid->control_duty = control;
+    // Signed control output. Positive = fire the thruster that corrects a
+    // positive error, negative = fire the opposite thruster. Because D is
+    // included, a fast swing back toward 0 can flip the sign and fire the
+    // opposite thruster to brake, even while the error is still positive.
+    float u = P + I + D;
 
-    // Saturation and anti-windup back calculation to remove error 
-    // accumulated in this timestep
-    if (control > pid->max_duty) {
-        control = pid->max_duty;
-        pid->integral -= error*dt; // can put a gain kt on this too if need be
-    }
-    else if (control < pid->min_duty) {
-        control = pid->min_duty;
+    // Saturation (both directions) + anti-windup back-calculation
+    if (u > pid->max_duty) {
+        u = pid->max_duty;
         pid->integral -= error*dt;
     }
-    
-    return (uint16_t)control; // CCR has to be uint16_t
-}   
-
-void select_thruster(float pitch_error, float pitch_duty, float yaw_error, float yaw_duty, float dt) {
-    // map PWM to total impulse desired? thrust*seconds. maybe not needed tbh.
-    int ACCEPTABLE = 5; // degrees
-    if (pitch_error < -ACCEPTABLE) {
-        // actuate pitch thruster in +ve
-        TIM1->CCR1 = pitch_duty; 
-        TIM1->CCR2 = 0; // make sure only 1 actuated in the same axis
-    }
-    else if (pitch_error > ACCEPTABLE ) {
-        // actuate pitch thruster in -ve direction
-        TIM1->CCR1 = 0;
-        TIM1->CCR2 = pitch_duty;
-    }
-    else {
-        // do not actuate pitch thruster (default)
-        TIM1->CCR1 = 0;
-        TIM1->CCR2 = 0;        
+    else if (u < -pid->max_duty) {
+        u = -pid->max_duty;
+        pid->integral -= error*dt;
     }
 
-    if (yaw_error < -ACCEPTABLE) {
-        // actuate yaw thruster in +ve
-        TIM1->CCR3 = yaw_duty;
-        TIM1->CCR4 = 0; 
-    }
-    else if (yaw_error > ACCEPTABLE ) {
-        // actuate yaw thruster in -ve direction
-        TIM1->CCR3 = 0;
-        TIM1->CCR4 = yaw_duty; 
-    }
-    else {
-        // do not actuate yaw thruster
-        TIM1->CCR3 = 0;
-        TIM1->CCR4 = 0; 
-    }
-
-
+    pid->control_duty = u;
+    return u;   // signed, -max_duty .. +max_duty
 }
+
+// ============================ DEADBAND SETTINGS ============================
+// Pick ONE deadband mode by changing DEADBAND_MODE below.
+//
+// DEADBAND_ON_ERROR  : no thruster fires while |angle error| < DEADBAND_DEG.
+//                      Simple: "nothing happens within X deg of level".
+//                      Inside the band the D term cannot brake.
+//
+// DEADBAND_ON_OUTPUT : no thruster fires while |P+I+D| < Kp * DEADBAND_DEG.
+//                      Same as above when the board is still, but the D term
+//                      can still fire a braking pulse near level if the board
+//                      is rotating fast.
+//
+// In both modes the valve is chosen by the SIGN of P+I+D, so D can fire the
+// opposite thruster to slow a swing.
+#define DEADBAND_ON_ERROR   0
+#define DEADBAND_ON_OUTPUT  1
+
+#define DEADBAND_MODE  DEADBAND_ON_OUTPUT  // <-- change this
+#define DEADBAND_DEG   0.5f                 // <-- deadband size in degrees
+#define NEAR_DEG       0.5f                 // within this angle...
+#define RATE_DEADBAND  8.0f                 // ...and slower than this (deg/s), don't fire
+// ==========================================================================
+
+// Fire one valve of an axis from a signed control value.
+//   u > 0 -> pos_ccr opens (corrects positive error)
+//   u < 0 -> neg_ccr opens (corrects negative error)
+static void drive_axis(const PID_params *pid, float u,
+                       volatile uint32_t *pos_ccr, volatile uint32_t *neg_ccr) {
+    float mag = fabsf(u);
+
+#if DEADBAND_MODE == DEADBAND_ON_ERROR
+    int inside_deadband = fabsf(pid->error) < DEADBAND_DEG;
+#else
+    int inside_deadband = mag < pid->Kp * DEADBAND_DEG;
+#endif
+
+    // close to level and moving slowly: leave it to gravity, stops small drifts triggering big kicks
+    if (fabsf(pid->error) < NEAR_DEG && fabsf(pid->rate) < RATE_DEADBAND) inside_deadband = 1;
+
+    if (inside_deadband || mag == 0.0f) {         // both valves shut
+        *pos_ccr = 0;
+        *neg_ccr = 0;
+        return;
+    }
+    if (mag < pid->min_duty) mag = pid->min_duty; // floor so the valve actually opens
+    if (mag > pid->max_duty) mag = pid->max_duty;
+    uint32_t duty = (uint32_t)mag;
+    if (u > 0) { *neg_ccr = 0; *pos_ccr = duty; } // close the other valve first
+    else       { *pos_ccr = 0; *neg_ccr = duty; }
+}
+
+// Valve mapping:
+//   Pitch: +u -> CCR3, -u -> CCR1
+//   Yaw:   +u -> CCR2, -u -> CCR4
+void select_thruster(const PID_params *pitch, float pitch_u,
+                     const PID_params *yaw, float yaw_u) {
+    drive_axis(pitch, pitch_u, &TIM1->CCR1, &TIM1->CCR3);
+    drive_axis(yaw,   yaw_u,   &TIM1->CCR2, &TIM1->CCR4);
+}   

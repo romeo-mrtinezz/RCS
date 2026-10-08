@@ -1,5 +1,3 @@
-
-
 #ifndef __PID_H
 #define __PID_H
 
@@ -12,10 +10,13 @@ typedef struct {
     float min_duty, max_duty;
     float error;
     float control_duty;
+    float rate;          // error rate, deg/s (set in pid_update)
 } PID_params;
 
-float comp_filter(float alpha, float dt, float prev_angle, float gyro_rate, float accel_angle);
 void pid_init(PID_params *pid); 
+// Returns the signed control value, -max_duty .. +max_duty
 float pid_update(PID_params *pid, float set_point, float angle_estimate, float dt);
-void select_thruster(float pitch_error, float pitch_duty, float yaw_error, float yaw_duty, float dt);
+// pitch_u / yaw_u are the signed outputs of pid_update()
+void select_thruster(const PID_params *pitch, float pitch_u,
+                     const PID_params *yaw, float yaw_u);
 #endif /*__PID_H*/
