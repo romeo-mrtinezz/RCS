@@ -19,7 +19,6 @@ because it would for the varying duty cycles to take effect
 
 
 */
-
 #include "PID.h"
 #include "main.h"
 #include "global.h"
@@ -31,7 +30,7 @@ because it would for the varying duty cycles to take effect
 
 // pass in pointer to pid so we can update them directly instead of making 100 copies
 void pid_init(PID_params *pid) {
-    pid->Kp = 600, pid->Ki = 300, pid->Kd = 600;
+    pid->Kp = 600, pid->Ki = 200, pid->Kd = 900;
     pid -> integral = 0;
     pid -> prev_error = 0; 
     pid->min_duty = 0, pid->max_duty = 10000; // Duty cycle max 3800 6200

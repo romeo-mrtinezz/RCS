@@ -39,6 +39,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
 #include "usbd_def.h"
@@ -297,7 +298,8 @@ void StartControlLoop(void *argument)
   for(;;)
   {
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
-    control_update(full_data.pitch, full_data.yaw, 0.1f, &ctrl);
+    // gyro rates with the same signs as the filter: pitch = -rate_y, yaw = -rate_z
+    control_update(full_data.pitch, full_data.yaw, -full_data.rate_y, -full_data.rate_z, 0.1f, &ctrl);
     HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
     full_data.pitch_error = ctrl.pitch_error;
     full_data.yaw_error   = ctrl.yaw_error;
@@ -312,7 +314,8 @@ void StartControlLoop(void *argument)
       thrusters_all_off();  // disarmed: valves held shut regardless of angle
       control_reset();      // integral starts from 0 every time you arm
     }
-    osDelay(100); // 10 Hz, 100ms
+    osDelay(100); // 10hz, 100ms
+
   }
   /* USER CODE END StartControlLoop */
 }
@@ -493,6 +496,13 @@ void StartUserMenu(void *argument)
       } else if (strcmp(rfd_cmd, "stop") == 0) {
         thrusters_armed = 0;
         thrusters_all_off();
+        control_set_target(0, 0);   // back to level for the next start
+      } else if (strncmp(rfd_cmd, "sp ", 3) == 0) {
+        // "sp <pitch> <yaw>" in deg, e.g. "sp 5 -3"
+        char *end;
+        float p = strtof(rfd_cmd + 3, &end);
+        float y = strtof(end, NULL);
+        control_set_target(p, y);
       }
       // "ping" (or anything else) just refreshes the link timer
       rfd_cmd_ready = 0;
