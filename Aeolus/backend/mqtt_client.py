@@ -16,16 +16,19 @@ mqtt_config = MQTTConfig(
 
 fast_mqtt = FastMQTT(config=mqtt_config)
 
-@fast_mqtt.on_connect()
-def connect(client: MQTTClient, flags: int, rc: int, properties: Any):
-    print("Connected: ", client, flags, rc, properties)
-    client.subscribe("pressure/high")  # subscribing to mqtt topic
-    client.subscribe("pressure/low")
+## I want to publish a value to the topic aeolus/pressure/high
+
+
 
 async def mqtt_start():
     print("Attempting to start mqtt client")
     await fast_mqtt.mqtt_startup()
 
+# @fast_mqtt.on_connect()
+# def connect(client: MQTTClient, flags: int, rc: int, properties: Any):
+#     print("Connected: ", client, flags, rc, properties)
+#     client.subscribe("pressure/high")  # subscribing to mqtt topic
+#     client.subscribe("pressure/low")
 
 # Publishing
 # async def func():
