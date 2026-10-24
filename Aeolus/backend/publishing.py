@@ -4,6 +4,7 @@ from gmqtt import Client as MQTTClient
 
 from fastapi_mqtt import FastMQTT, MQTTConfig
 import time
+import serial
 mqtt_config = MQTTConfig()
 fast_mqtt = FastMQTT(config=mqtt_config)
 
@@ -14,3 +15,4 @@ dummy_pressure = 2 # bar
 # publish to mqtt broker
 fast_mqtt.publish("pressure/low","{pressure: dummy_pressure}")
 
+# async def publish()

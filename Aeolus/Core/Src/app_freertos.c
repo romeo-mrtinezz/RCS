@@ -384,8 +384,24 @@ void StartStream(void *argument)
     osMutexAcquire(AttitudeMutexHandle, osWaitForever);
 
     // Send over rfd, non-blocking
-    if (rfd_tx_flag == 1) {
-      sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+    // if (rfd_tx_flag == 1) {
+    //   sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
+    //     xTaskGetTickCount(),
+    //     full_data.rate_x, full_data.rate_y, full_data.rate_z,
+    //     full_data.acc_x, full_data.acc_y, full_data.acc_z,
+    //     full_data.pitch_accel, full_data.yaw_accel,
+    //     full_data.pitch, full_data.yaw,
+    //     full_data.pitch_error, full_data.yaw_error,
+    //     full_data.pitch_duty, full_data.yaw_duty,
+    //     high_pressure, low_pressure
+    //   );
+    //   HAL_UART_Transmit_DMA(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf));
+      
+    //   rfd_tx_flag = 0; // ensures we only transmit after previos=us transmission completed
+    // }
+
+    // Send over USB
+    sprintf(rfd_buf, "%lu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n",
         xTaskGetTickCount(),
         full_data.rate_x, full_data.rate_y, full_data.rate_z,
         full_data.acc_x, full_data.acc_y, full_data.acc_z,
@@ -395,9 +411,8 @@ void StartStream(void *argument)
         full_data.pitch_duty, full_data.yaw_duty,
         high_pressure, low_pressure
       );
-      HAL_UART_Transmit_DMA(&huart4, (uint8_t *)rfd_buf, strlen(rfd_buf));
-      rfd_tx_flag = 0; // ensures we only transmit after previos=us transmission completed
-    }
+    CDC_Transmit_FS((uint8_t *)rfd_buf, strlen(rfd_buf));
+    HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
     osMutexRelease(AttitudeMutexHandle);
     osDelay(95); // 10Hz, 100ms
   }

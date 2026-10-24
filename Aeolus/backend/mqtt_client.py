@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from gmqtt import Client as MQTTClient
 
 from fastapi_mqtt import FastMQTT, MQTTConfig
+import json
+from loguru import logger
 
 HOST = "localhost"
 PORT = 1883
@@ -24,6 +26,10 @@ async def mqtt_start():
     print("Attempting to start mqtt client")
     await fast_mqtt.mqtt_startup()
 
+async def mqtt_publish(topic, payload):
+    payload = json.dumps(payload)
+    fast_mqtt.publish(topic, payload)
+    logger.info("Published message to mqtt network")
 # @fast_mqtt.on_connect()
 # def connect(client: MQTTClient, flags: int, rc: int, properties: Any):
 #     print("Connected: ", client, flags, rc, properties)

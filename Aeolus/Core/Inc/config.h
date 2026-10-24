@@ -3,20 +3,21 @@
 
 // Feel free to change these params
 
+#define stream_rfd            0 // toggle between streaming over usb or rfd
+
 // PID --------------------------- used in pid.c
 // Currently behaving like bang bang
-#define KP                    = 10000
-#define KI                    = 0
-#define KD                    = 0
-#define MAX_DUTY              = 10000 // Divide by 100 for duty cycle percentage
-#define MIN_DUty              = 0
-#define ANGLE_ERROR_TOLERANCE = 2 // Degrees from vertical
-
-// FreeRTOS Task Rates in Hz
-#define STREAM_RATE           = 10
-#define LOG_RATE              = 170   
-#define CONTROL_ALG_RATE      = 10 
-#define READ_IMU_RATE         = 100
+#define KP                    10000
+#define KI                    0
+#define KD                    0
+#define MAX_DUTY              10000 // Divide by 100 for duty cycle percentage
+#define MIN_DUTY              0
+#define ANGLE_ERROR_TOLERANCE 2 // Degrees from vertica
+// FreeRTOS Task Rates in 
+#define STREAM_RATE           10
+#define LOG_RATE              170   
+#define CONTROL_ALG_RATE      10 
+#define READ_IMU_RATE         100
 
 /*
 If thrusters are in wrong axes, go to select_thrusters function in pid.c
