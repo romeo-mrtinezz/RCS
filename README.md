@@ -1,6 +1,6 @@
 # RCS
 
-This repository details the firmware for custom flight controller "Aelous"
+This repository details the firmware for custom flight controller "Aelous". The main logic can be found in Aeolus/Core/Src/app_freertos.c
 
 Fig 1: Aeolus v1
 <img width="1047" height="675" alt="image" src="https://github.com/user-attachments/assets/79883fa9-0cbc-4f17-9ccc-13fb4e9ef303" />
