@@ -29,7 +29,7 @@ async def mqtt_start():
 async def mqtt_publish(topic, payload):
     payload = json.dumps(payload)
     fast_mqtt.publish(topic, payload)
-    logger.info("Published message to mqtt network")
+    # logger.info("Published message to mqtt network")
 # @fast_mqtt.on_connect()
 # def connect(client: MQTTClient, flags: int, rc: int, properties: Any):
 #     print("Connected: ", client, flags, rc, properties)

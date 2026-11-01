@@ -14,10 +14,9 @@ async def high_pressure_callback(client, topic: str, payload: bytes, qos: int, p
         pressure = data.get("pressure")
 
         if pressure is None:    
-            print(f"\033[93m[WARNING] Payload on '{topic}' missing 'pressure' key: {data}\033[0m")
+            logger.warning(f"Payload on '{topic}' missing 'pressure' key: {data}")
             return
         logger.info(f"[SUBSCRIBER | {topic}] Pressure received: {pressure}")
-        # print(f"\033[96m[SUBSCRIBER | {topic}] Pressure received: {pressure}\033[0m")
 
     except (UnicodeDecodeError, json.JSONDecodeError) as err:
-        print(f"\033[91m[ERROR] Failed to decode JSON payload on '{topic}': {err}\033[0m")
+        logger.error(f"Failed to decode JSON payload on '{topic}': {err}")

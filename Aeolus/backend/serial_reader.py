@@ -50,6 +50,4 @@ async def read_port():
     # Read a line then return its contents?
     # Every line format is the same, value separated by a comma.
     
-
-
     ser.close
