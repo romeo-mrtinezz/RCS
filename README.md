@@ -8,5 +8,5 @@ Fig 1: Aeolus v1
 
 
 Fig 2: Aeolus v1.1
-<img width="1100" height="720" alt="image" src="https://github.com/user-attachments/assets/fd356c9c-fc13-4c8b-a743-a574f83a7270" />
+<img width="1157" height="766" alt="image" src="https://github.com/user-attachments/assets/04638e71-6107-4fb7-a1b9-71fe50f686e9" />
 <img width="1024" height="768" alt="image" src="https://github.com/user-attachments/assets/bb75d11d-3930-44a8-8689-0a96a1f0df57" />
